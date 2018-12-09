@@ -3,6 +3,8 @@ name = "diesel-factories-code-gen"
 version = "0.0.1"
 authors = ["David Pedersen <david.pdrsn@gmail.com>"]
 edition = "2018"
+description = "Internals for diesel-factories"
+license = "MIT"
 
 [dependencies]
 syn = { version = "0.15.22", features = ["full", "parsing", "extra-traits"] }
