@@ -72,6 +72,7 @@ use diesel::backend::SupportsReturningClause;
 use diesel::connection::Connection;
 use diesel::sql_types::HasSqlType;
 use std::default::Default;
+use diesel::pg::PgConnection;
 
 pub use diesel_factories_code_gen::Factory;
 
@@ -124,8 +125,5 @@ pub trait InsertFactory<T> {
     ///
     /// Will panic if there was a database error. That should be fine since you want to fail fast
     /// in tests when something goes wrong.
-    fn insert<Con, DB>(self, con: &Con) -> T
-    where
-        Con: Connection<Backend = DB>,
-        DB: 'static + Backend<RawValue = [u8]> + SupportsDefaultKeyword + SupportsReturningClause;
+    fn insert(self, con: &PgConnection) -> T;
 }

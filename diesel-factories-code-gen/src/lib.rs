@@ -48,14 +48,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         }
 
         impl diesel_factories::InsertFactory<#model_name> for #factory_name {
-            fn insert<Con, DB>(self, con: &Con) -> #model_name
-            where
-                Con: diesel::connection::Connection<Backend = DB>,
-                DB: 'static
-                    + diesel::backend::Backend<RawValue = [u8]>
-                    + diesel::backend::SupportsDefaultKeyword
-                    + diesel::backend::SupportsReturningClause,
-            {
+            fn insert(self, con: &diesel::pg::PgConnection) -> #model_name {
                 let res = diesel::insert_into(<#model_name as diesel::associations::HasTable>::table())
                     .values(self)
                     .get_result::<#model_name>(con);
