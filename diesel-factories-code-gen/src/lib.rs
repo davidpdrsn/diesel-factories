@@ -29,6 +29,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
             let ty = field.ty;
             quote! {
+                #[allow(missing_docs)]
                 pub fn #name<T: Into<#ty>>(mut self, value: T) -> Self {
                     self.#name = value.into();
                     self
