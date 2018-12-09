@@ -1,7 +1,7 @@
 extern crate proc_macro;
 extern crate proc_macro2;
 
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
 use quote::quote;
 use regex::Regex;
 use syn::punctuated::Pair;
@@ -9,7 +9,8 @@ use syn::Ident;
 use syn::{parse_macro_input, Attribute, DeriveInput};
 use syn::{Data, Fields, FieldsNamed};
 
-#[proc_macro_derive(Factory, attributes(factory_model, factory_default))]
+/// See the docs for "diesel_factories" for more info about this.
+#[proc_macro_derive(Factory, attributes(factory_model))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
