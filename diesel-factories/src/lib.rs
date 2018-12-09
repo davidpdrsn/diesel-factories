@@ -52,7 +52,7 @@
 //!     # con.begin_test_transaction();
 //!
 //!     // Create a new user using our factory, overriding the default name
-//!     let user = User::default_factory().name("Alice").insert::<User, _, _>(&con);
+//!     let user = User::default_factory().name("Alice").insert(&con);
 //!     assert_eq!("Alice", user.name);
 //!     assert_eq!(30, user.age);
 //!
@@ -66,12 +66,10 @@
 //! }
 //! ```
 
-use diesel::associations::HasTable;
-use diesel::backend::{Backend, SupportsReturningClause};
+use diesel::backend::Backend;
+use diesel::backend::SupportsDefaultKeyword;
+use diesel::backend::SupportsReturningClause;
 use diesel::connection::Connection;
-use diesel::insertable::CanInsertInSingleQuery;
-use diesel::prelude::*;
-use diesel::query_builder::QueryFragment;
 use diesel::sql_types::HasSqlType;
 use std::default::Default;
 
@@ -121,56 +119,13 @@ pub trait DefaultFactory<T: Default> {
 }
 
 /// Method for inserting a factory object into the database.
-pub trait InsertFactory {
+pub trait InsertFactory<T> {
     /// Perform the insert and return the model.
     ///
     /// Will panic if there was a database error. That should be fine since you want to fail fast
     /// in tests when something goes wrong.
-    fn insert<Model, Con, DB>(self, con: &Con) -> Model
+    fn insert<Con, DB>(self, con: &Con) -> T
     where
-        Self: Insertable<<Model as HasTable>::Table>,
-        <Self as Insertable<<Model as HasTable>::Table>>::Values:
-            CanInsertInSingleQuery<DB> + QueryFragment<DB>,
         Con: Connection<Backend = DB>,
-        DB: 'static
-            + Backend
-            + SupportsReturningClause
-            + HasSqlType<<<<Model as HasTable>::Table as Table>::AllColumns as Expression>::SqlType>,
-        Model: HasTable
-            + Queryable<
-                <<<Model as HasTable>::Table as Table>::AllColumns as Expression>::SqlType,
-                DB,
-            >,
-        <<Model as HasTable>::Table as Table>::AllColumns: QueryFragment<DB>,
-        <<Model as HasTable>::Table as QuerySource>::FromClause: QueryFragment<DB>;
-}
-
-impl<Factory> InsertFactory for Factory {
-    fn insert<Model, Con, DB>(self, con: &Con) -> Model
-    where
-        Self: Insertable<<Model as HasTable>::Table>,
-        <Self as Insertable<<Model as HasTable>::Table>>::Values:
-            CanInsertInSingleQuery<DB> + QueryFragment<DB>,
-        Con: Connection<Backend = DB>,
-        DB: 'static
-            + Backend
-            + SupportsReturningClause
-            + HasSqlType<<<<Model as HasTable>::Table as Table>::AllColumns as Expression>::SqlType>,
-        Model: HasTable
-            + Queryable<
-                <<<Model as HasTable>::Table as Table>::AllColumns as Expression>::SqlType,
-                DB,
-            >,
-        <<Model as HasTable>::Table as Table>::AllColumns: QueryFragment<DB>,
-        <<Model as HasTable>::Table as QuerySource>::FromClause: QueryFragment<DB>,
-    {
-        let res = diesel::insert_into(Model::table())
-            .values(self)
-            .get_result::<Model>(con);
-
-        match res {
-            Ok(record) => record,
-            Err(err) => panic!("{}", err),
-        }
-    }
+        DB: 'static + Backend<RawValue = [u8]> + SupportsDefaultKeyword + SupportsReturningClause;
 }

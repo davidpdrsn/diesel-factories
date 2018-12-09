@@ -1,3 +1,5 @@
+#![recursion_limit="128"]
+
 extern crate proc_macro;
 extern crate proc_macro2;
 
@@ -43,6 +45,26 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
         impl #factory_name {
             #(#methods)*
+        }
+
+        impl diesel_factories::InsertFactory<#model_name> for #factory_name {
+            fn insert<Con, DB>(self, con: &Con) -> #model_name
+            where
+                Con: diesel::connection::Connection<Backend = DB>,
+                DB: 'static
+                    + diesel::backend::Backend<RawValue = [u8]>
+                    + diesel::backend::SupportsDefaultKeyword
+                    + diesel::backend::SupportsReturningClause,
+            {
+                let res = diesel::insert_into(<#model_name as diesel::associations::HasTable>::table())
+                    .values(self)
+                    .get_result::<#model_name>(con);
+
+                match res {
+                    Ok(x) => x,
+                    Err(err) => panic!("{}", err),
+                }
+            }
         }
     };
 
