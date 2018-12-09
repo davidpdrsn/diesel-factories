@@ -6,3 +6,7 @@ edition = "2018"
 
 [dependencies]
 diesel = { version = "1.3.3" }
+diesel-factories-code-gen = { path = "../diesel-factories-code-gen" }
+
+[dev_dependencies]
+diesel = { version = "1.3.3", features = ["postgres"] }

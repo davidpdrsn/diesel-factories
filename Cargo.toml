@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "diesel-factories",
+    "diesel-factories-code-gen",
+]
