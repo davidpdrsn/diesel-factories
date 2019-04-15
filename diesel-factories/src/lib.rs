@@ -70,17 +70,19 @@ use diesel::backend::Backend;
 use diesel::backend::SupportsDefaultKeyword;
 use diesel::backend::SupportsReturningClause;
 use diesel::connection::Connection;
-use diesel::sql_types::HasSqlType;
-use std::default::Default;
 use diesel::pg::Pg;
+use diesel::sql_types::HasSqlType;
+use lazy_static::lazy_static;
+use std::{
+    default::Default,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub use diesel_factories_code_gen::Factory;
 
 /// Indicate which factory is the default for a given model type.
 ///
 /// This trait is implemented automatically when you use `#[derive(Factory)]`.
-///
-/// impl DefaultFactory<#factory_name> for #model_name {}
 /// ```
 /// # #[macro_use]
 /// # extern crate diesel;
@@ -128,4 +130,28 @@ pub trait InsertFactory<T> {
     fn insert<Con>(self, con: &Con) -> T
     where
         Con: Connection<Backend = Pg>;
+}
+
+lazy_static! {
+    static ref SEQUENCE_COUNTER: AtomicUsize = { AtomicUsize::new(0) };
+}
+
+/// Utility function for generating unique ids or strings in factories.
+/// Each time `sequence` gets called, the closure will receive a different number.
+///
+/// ```
+/// use diesel_factories::sequence;
+///
+/// assert_ne!(
+///     sequence(|i| format!("unique-string-{}", i)),
+///     sequence(|i| format!("unique-string-{}", i)),
+/// );
+/// ```
+pub fn sequence<T, F>(f: F) -> T
+where
+    F: Fn(usize) -> T,
+{
+    SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let count = SEQUENCE_COUNTER.load(Ordering::Relaxed);
+    f(count)
 }
