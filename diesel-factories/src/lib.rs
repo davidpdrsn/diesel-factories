@@ -1,7 +1,7 @@
 //! This libraries makes it straight forward to create [factories][] that work with [Diesel][].
 //!
 //! [factories]: https://thoughtbot.com/blog/why-factories
-//! [Diesel]: https://dielse.rs
+//! [Diesel]: https://diesel.rs
 //!
 //! # WIP
 //!
