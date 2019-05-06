@@ -17,18 +17,9 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     let input = parse_macro_input!(input as DeriveInput);
 
     let model_name = model_name(&input.attrs);
-    let factory_name = input.ident
-
-    .clone();
-
+    let factory_name = input.ident.clone();
 
     let fields = struct_fields(input);
-
-
-
-
-
-
 
     let methods = fields
         .named
