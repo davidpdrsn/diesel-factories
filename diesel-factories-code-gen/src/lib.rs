@@ -69,11 +69,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 fn model_name(attrs: &Vec<Attribute>) -> Ident {
     let factory_model_attr = attrs.into_iter().find(|attr| {
-        attr
-
-
-
-        .path
+        attr.path
             .segments
             .iter()
             .any(|segment| &segment.ident.to_string() == "factory_model")
