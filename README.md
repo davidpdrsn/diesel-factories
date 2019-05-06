@@ -4,7 +4,10 @@ Test factories for Diesel.
 
 Still very much work in progress.
 
-
+To install the cargo fmt pre-commit githook:
+```sh
+git config core.hooksPath ./githooks
+```
 To run tests, you will need to create a database:
 
 ```sql
