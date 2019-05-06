@@ -173,7 +173,6 @@
 //!         let res = diesel::insert_into(<User as diesel::associations::HasTable>::table())
 //!             .values(self)
 //!             .get_result::<User>(con);
-//! 
 //!         match res {
 //!             Ok(inner) => inner,
 //!             Err(err) => panic!("{}", err),
