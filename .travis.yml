@@ -8,6 +8,7 @@ rust:
 cache: cargo
 
 before_script:
+  - psql -c "CREATE DATABASE diesel_factories_test;" -U postgres
   - rustup component add rustfmt-preview
 
 script:
