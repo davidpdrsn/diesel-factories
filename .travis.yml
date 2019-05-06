@@ -11,7 +11,7 @@ before_script:
   - psql -c "CREATE DATABASE diesel_factories_test;" -U postgres
   - cargo install diesel_cli --no-default-features --features postgres
   - diesel migration run --database-url postgresql://localhost:5432/diesel_factories_test
-  - rustup component add rustfmt-preview
+  - rustup component add rustfmt
 
 script:
   - cargo fmt -- --check
