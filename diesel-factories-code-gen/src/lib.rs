@@ -47,6 +47,15 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             #(#methods)*
         }
 
+
+
+
+
+
+
+
+
+
         impl diesel_factories::InsertFactory<#model_name> for #factory_name {
             fn insert<Con>(self, con: &Con) -> #model_name
             where
