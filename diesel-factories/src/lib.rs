@@ -1,7 +1,7 @@
 //! This libraries makes it straight forward to create [factories][] that work with [Diesel][].
 //!
 //! [factories]: https://thoughtbot.com/blog/why-factories
-//! [Diesel]: https://dielse.rs
+//! [Diesel]: https://diesel.rs
 //!
 //! # WIP
 //!
@@ -173,7 +173,6 @@
 //!         let res = diesel::insert_into(<User as diesel::associations::HasTable>::table())
 //!             .values(self)
 //!             .get_result::<User>(con);
-//! 
 //!         match res {
 //!             Ok(inner) => inner,
 //!             Err(err) => panic!("{}", err),

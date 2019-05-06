@@ -8,7 +8,9 @@ rust:
 cache: cargo
 
 before_script:
-  - rustup component add rustfmt-preview
+  - psql -c "CREATE DATABASE diesel_factories_test;" -U postgres
+  - diesel migration run --database-url postgresql://localhost:5432/diesel_factories_test
+  - rustup component add rustfmt
 
 script:
   - cargo fmt -- --check
