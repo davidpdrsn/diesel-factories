@@ -24,21 +24,20 @@ pub struct User {
 }
 
 // On a normal Diesel `Insertable` you can derive `Factory`
-#[derive(Insertable, Factory)]
-#[table_name = "users"]
-// And specify which model type the factory is for
-#[factory_model(User)]
-pub struct UserFactory {
+
+pub struct UserFactory<'a> {
     name: String,
     age: i32,
+    connection: &'a PgConnection,
 }
 
-// Set default values. If you don't implement `Default` it wont work.
-impl Default for UserFactory {
-    fn default() -> UserFactory {
+impl<'a> UserFactory<'a> {
+    // Set default values here
+    fn new(connection_in: &'a PgConnection) -> UserFactory<'a> {
         UserFactory {
             name: "Bob".into(),
             age: 30,
+            connection: connection_in,
         }
     }
 }
@@ -53,7 +52,7 @@ fn basic_test() {
     con.begin_test_transaction();
 
     // Create a new user using our factory, overriding the default name
-    let user = User::default_factory().name("Alice").insert(&con);
+    let user = UserFactory::new(&con).name("Alice").insert();
     assert_eq!("Alice", user.name);
     assert_eq!(30, user.age);
 
