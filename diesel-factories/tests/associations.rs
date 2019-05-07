@@ -55,8 +55,25 @@ impl Default for UserFactory {
 // FIXME this is dummy code to allow compilation
 // Next step is to get it working using hand-written code
 // Then translate into a macro
+
+trait CountryAssociation {
+    fn country_id(&mut self);
+}
+
+impl CountryAssociation for CountryFactory {
+    fn country_id(&mut self) {
+        unimplemented!();
+    }
+}
+
+impl CountryAssociation for Country {
+    fn country_id(&mut self) {
+        unimplemented!();
+    }
+}
+
 impl UserFactory {
-    fn country(&self, factory: &CountryFactory) -> Self {
+    fn country(&self, association: &CountryAssociation) -> Self {
         unimplemented!();
     }
 }
@@ -119,7 +136,7 @@ fn creating_user_and_country() {
 
 #[test]
 fn create_two_users_with_the_same_country() {
-    use self::countries;
+    use self::countrys;
     use diesel::dsl::count_star;
     let con = setup();
 
@@ -144,12 +161,12 @@ fn create_two_users_with_the_same_country() {
         find_country_by_id(bob.country_id.unwrap(), &con).id,
         find_country_by_id(alice.country_id.unwrap(), &con).id
     );
-    assert_eq!(Ok(1), countries::table.select(count_star()).first(&con));
+    assert_eq!(Ok(1), countrys::table.select(count_star()).first(&con));
 }
 
 #[test]
-fn create_two_users_with_distinct_countries_from_the_same_builder() {
-    use self::countries;
+fn create_two_users_with_distinct_countrys_from_the_same_builder() {
+    use self::countrys;
     use diesel::dsl::count_star;
     let con = setup();
 
@@ -180,7 +197,7 @@ fn create_two_users_with_distinct_countries_from_the_same_builder() {
         find_country_by_id(bob.country_id.unwrap(), &con).id,
         find_country_by_id(alice.country_id.unwrap(), &con).id
     );
-    assert_eq!(Ok(2), countries::table.select(count_star()).first(&con));
+    assert_eq!(Ok(2), countrys::table.select(count_star()).first(&con));
 }
 
 fn setup() -> PgConnection {
