@@ -12,7 +12,7 @@ table! {
         id -> Integer,
         name -> Text,
         age -> Integer,
-        country_id -> Integer,
+        country_id -> Nullable<Integer>,
     }
 }
 
@@ -29,7 +29,7 @@ pub struct User {
     pub id: i32,
     pub name: String,
     pub age: i32,
-    pub country_id: i32,
+    pub country_id: Option<i32>,
 }
 
 // On a normal Diesel `Insertable` you can derive `Factory`
@@ -53,6 +53,8 @@ impl Default for UserFactory {
 }
 
 // FIXME this is dummy code to allow compilation
+// Next step is to get it working using hand-written code
+// Then translate into a macro
 impl UserFactory {
     fn country(&self, factory: &CountryFactory) -> Self {
         unimplemented!();
@@ -109,11 +111,46 @@ fn creating_user_and_country() {
 
     let alice_db = find_user_by_id(alice.id, &con);
     assert_eq!(alice_db.name, "Alice");
-    assert_eq!(find_country_by_id(alice_db.country_id, &con).name, "USA");
+    assert_eq!(
+        find_country_by_id(alice_db.country_id.unwrap(), &con).name,
+        "USA"
+    );
 }
 
 #[test]
 fn create_two_users_with_the_same_country() {
+    use self::countries;
+    use diesel::dsl::count_star;
+    let con = setup();
+
+    let country = CountryFactory::default().name("USA").insert(&con);
+
+    let bob = UserFactory::default()
+        .name("Bob")
+        .country(&country)
+        .insert(&con);
+
+    let alice = UserFactory::default()
+        .name("Alice")
+        .country(&country)
+        .insert(&con);
+
+    assert_eq!(
+        find_country_by_id(bob.country_id.unwrap(), &con).name,
+        "USA"
+    );
+    assert_eq!(bob.country_id, alice.country_id);
+    assert_eq!(
+        find_country_by_id(bob.country_id.unwrap(), &con).id,
+        find_country_by_id(alice.country_id.unwrap(), &con).id
+    );
+    assert_eq!(Ok(1), countries::table.select(count_star()).first(&con));
+}
+
+#[test]
+fn create_two_users_with_distinct_countries_from_the_same_builder() {
+    use self::countries;
+    use diesel::dsl::count_star;
     let con = setup();
 
     let country_factory = CountryFactory::default().name("USA");
@@ -123,17 +160,27 @@ fn create_two_users_with_the_same_country() {
         .country(&country_factory)
         .insert(&con);
 
+    // Imagine there are other useful properties set up on this builder
+    let country_factory = country_factory.name("Canada");
     let alice = UserFactory::default()
         .name("Alice")
         .country(&country_factory)
         .insert(&con);
 
-    assert_eq!(find_country_by_id(bob.country_id, &con).name, "USA");
-    assert_eq!(bob.country_id, alice.country_id);
     assert_eq!(
-        find_country_by_id(bob.country_id, &con).id,
-        find_country_by_id(alice.country_id, &con).id
+        find_country_by_id(bob.country_id.unwrap(), &con).name,
+        "USA"
     );
+    assert_eq!(
+        find_country_by_id(alice.country_id.unwrap(), &con).name,
+        "Canada"
+    );
+    assert_ne!(bob.country_id, alice.country_id);
+    assert_ne!(
+        find_country_by_id(bob.country_id.unwrap(), &con).id,
+        find_country_by_id(alice.country_id.unwrap(), &con).id
+    );
+    assert_eq!(Ok(2), countries::table.select(count_star()).first(&con));
 }
 
 fn setup() -> PgConnection {
