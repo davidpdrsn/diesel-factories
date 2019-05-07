@@ -40,6 +40,7 @@ pub struct User {
 pub struct UserFactory {
     name: String,
     age: i32,
+    country_id: Option<i32>,
 }
 
 // Set default values. If you don't implement `Default` it wont work.
@@ -48,6 +49,7 @@ impl Default for UserFactory {
         UserFactory {
             name: "Bob".into(),
             age: 30,
+            country_id: None,
         }
     }
 }
@@ -57,24 +59,26 @@ impl Default for UserFactory {
 // Then translate into a macro
 
 trait CountryAssociation {
-    fn country_id(&mut self);
+    fn country_id(&self) -> i32;
 }
 
 impl CountryAssociation for CountryFactory {
-    fn country_id(&mut self) {
+    fn country_id(&self) -> i32 {
+        dbg!(self);
         unimplemented!();
     }
 }
 
 impl CountryAssociation for Country {
-    fn country_id(&mut self) {
-        unimplemented!();
+    fn country_id(&self) -> i32 {
+        self.id
     }
 }
 
 impl UserFactory {
-    fn country(&self, association: &CountryAssociation) -> Self {
-        unimplemented!();
+    fn country(mut self, association: &CountryAssociation) -> Self {
+        self.country_id = Some(association.country_id());
+        self
     }
 }
 // END FIXME
@@ -87,7 +91,7 @@ pub struct Country {
 }
 
 // On a normal Diesel `Insertable` you can derive `Factory`
-#[derive(Insertable, Factory)]
+#[derive(Insertable, Factory, Debug)]
 #[table_name = "countrys"]
 // And specify which model type the factory is for
 #[factory_model(Country)]
@@ -116,9 +120,25 @@ fn creating_user() {
     assert_eq!(find_user_by_id(bob.id, &con).name, "Bob");
     assert_eq!(find_user_by_id(alice.id, &con).name, "Alice");
 }
-
 #[test]
-fn creating_user_and_country() {
+fn creating_user_and_country_with_literal() {
+    let con = setup();
+    let country = CountryFactory::default().name("USA").insert(&con);
+
+    let alice = UserFactory::default()
+        .name("Alice")
+        .country(&country)
+        .insert(&con);
+
+    let alice_db = find_user_by_id(alice.id, &con);
+    assert_eq!(alice_db.name, "Alice");
+    assert_eq!(
+        find_country_by_id(alice_db.country_id.unwrap(), &con).name,
+        "USA"
+    );
+}
+#[test]
+fn creating_user_and_country_with_builder() {
     let con = setup();
 
     let alice = UserFactory::default()
