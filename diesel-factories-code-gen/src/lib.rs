@@ -21,15 +21,16 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
     let model_name = model_name(&input.attrs);
     let factory_name = input.ident.clone();
-    let fields = struct_fields(input);
-
-    let methods = fields
+    let fields = struct_fields(input)
         .named
         .into_pairs()
         .map(|pair| match pair {
             Pair::Punctuated(field, _) => field,
             Pair::End(field) => field,
-        })
+        });
+
+    let methods = fields
+        .clone()
         .map(|field| {
             let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
             let ty = field.ty;
@@ -43,6 +44,21 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         })
         .collect::<Vec<_>>();
 
+    let diesel_tuples = fields
+        .clone()
+        .filter_map(|field| {
+            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
+            let ty = field.ty;
+            if (name != "connection") {
+                Some(quote! {
+                    (#name.eq(&self.#name))
+                })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
     let tokens = quote! {
     impl<'a> #factory_name<'a> {
 
@@ -52,7 +68,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         fn insert(self) -> #model_name {
             use self::users::dsl::*;
             let res = diesel::insert_into(users)
-                .values(((name.eq(&self.name)), age.eq(&self.age)))
+                .values( #(#diesel_tuples)* )
                 .get_result::<#model_name>(self.connection);
 
             match res {
@@ -62,6 +78,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         }
     }
     };
+    println!("{}", tokens);
     tokens.into()
 }
 
