@@ -4,7 +4,7 @@ extern crate diesel_factories;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel_factories::{DefaultFactory, Factory, InsertFactory};
+use diesel_factories::Factory;
 
 // Tell Diesel what our schema is
 table! {
@@ -23,7 +23,8 @@ pub struct User {
     pub age: i32,
 }
 
-// On a normal Diesel `Insertable` you can derive `Factory`
+#[derive(Factory)]
+#[factory_model(User)]
 pub struct UserFactory<'a> {
     name: String,
     age: i32,
@@ -39,23 +40,6 @@ impl<'a> UserFactory<'a> {
             connection: connection_in,
         }
     }
-
-    fn name(mut self, new_value: &str) -> UserFactory<'a> {
-        self.name = new_value.to_string();
-        self
-    }
-
-    fn insert(self) -> User {
-        use self::users::dsl::*;
-        let res = diesel::insert_into(users)
-            .values(((name.eq(&self.name)), age.eq(&self.age)))
-            .get_result::<User>(self.connection);
-
-        match res {
-            Ok(x) => x,
-            Err(err) => panic!("{}", err),
-        }
-    }
 }
 
 #[test]
@@ -64,7 +48,7 @@ fn basic_test() {
 
     // Connect to the database
     let database_url = "postgres://localhost/diesel_factories_test";
-    let con = PgConnection::establish(&database_url).unwrap();
+    let con = diesel::pg::PgConnection::establish(&database_url).unwrap();
     con.begin_test_transaction();
 
     // Create a new user using our factory, overriding the default name

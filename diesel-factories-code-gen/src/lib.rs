@@ -2,7 +2,10 @@
 
 extern crate proc_macro;
 extern crate proc_macro2;
-
+#[macro_use]
+extern crate diesel;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
 use proc_macro2::Span;
 use quote::quote;
 use regex::Regex;
@@ -41,27 +44,24 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .collect::<Vec<_>>();
 
     let tokens = quote! {
-        impl diesel_factories::DefaultFactory<#factory_name> for #model_name {}
+    impl<'a> #factory_name<'a> {
 
-        impl #factory_name {
-            #(#methods)*
-        }
+        #(#methods)*
 
-        impl diesel_factories::InsertFactory<#model_name> for #factory_name {
-            fn insert<Con>(self) -> #model_name
-            {
-                let res = diesel::insert_into(<#model_name as diesel::associations::HasTable>::table())
-                    .values(self)
-                    .get_result::<#model_name>(self.connection);
 
-                match res {
-                    Ok(x) => x,
-                    Err(err) => panic!("{}", err),
-                }
+        fn insert(self) -> #model_name {
+            use self::users::dsl::*;
+            let res = diesel::insert_into(users)
+                .values(((name.eq(&self.name)), age.eq(&self.age)))
+                .get_result::<#model_name>(self.connection);
+
+            match res {
+                Ok(x) => x,
+                Err(err) => panic!("{}", err),
             }
         }
+    }
     };
-
     tokens.into()
 }
 
