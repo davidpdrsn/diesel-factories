@@ -58,7 +58,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             }
         })
         .collect::<Vec<_>>();
-
+    let combined_diesel_tuples = quote! { #(#diesel_tuples),* };
     let tokens = quote! {
     impl<'a> #factory_name<'a> {
 
@@ -68,7 +68,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         fn insert(self) -> #model_name {
             use self::users::dsl::*;
             let res = diesel::insert_into(users)
-                .values( #(#diesel_tuples)* )
+                .values(( #(#combined_diesel_tuples)* ))
                 .get_result::<#model_name>(self.connection);
 
             match res {
