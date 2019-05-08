@@ -24,7 +24,6 @@ pub struct User {
 }
 
 // On a normal Diesel `Insertable` you can derive `Factory`
-
 pub struct UserFactory<'a> {
     name: String,
     age: i32,
@@ -38,6 +37,23 @@ impl<'a> UserFactory<'a> {
             name: "Bob".into(),
             age: 30,
             connection: connection_in,
+        }
+    }
+
+    fn name(mut self, new_value: &str) -> UserFactory<'a> {
+        self.name = new_value.to_string();
+        self
+    }
+
+    fn insert(self) -> User {
+        use self::users::dsl::*;
+        let res = diesel::insert_into(users)
+            .values(((name.eq(&self.name)), age.eq(&self.age)))
+            .get_result::<User>(self.connection);
+
+        match res {
+            Ok(x) => x,
+            Err(err) => panic!("{}", err),
         }
     }
 }
