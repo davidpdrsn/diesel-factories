@@ -4,7 +4,7 @@ extern crate diesel_factories;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use diesel_factories::InsertFactory;
+use diesel_factories::Factory;
 
 // Tell Diesel what our schema is
 table! {
@@ -32,7 +32,8 @@ pub struct User {
     pub country_id: Option<i32>,
 }
 
-// On a normal Diesel `Insertable` you can derive `Factory`
+#[derive(Factory)]
+#[factory_model(User)]
 pub struct UserFactory<'a> {
     name: String,
     age: i32,
@@ -41,11 +42,6 @@ pub struct UserFactory<'a> {
 }
 
 impl<'a> UserFactory<'a> {
-    fn country(mut self, association: &CountryAssociation) -> UserFactory<'a> {
-        self.country_id = Some(association.country_id());
-        self
-    }
-
     // Set default values here
     fn new(connection_in: &'a PgConnection) -> UserFactory<'a> {
         UserFactory {
@@ -56,25 +52,9 @@ impl<'a> UserFactory<'a> {
         }
     }
 
-    fn name(mut self, new_value: &str) -> UserFactory<'a> {
-        self.name = new_value.to_string();
+    fn country(mut self, association: &CountryAssociation) -> UserFactory<'a> {
+        self.country_id = Some(association.country_id());
         self
-    }
-
-    fn insert(self) -> User {
-        use self::users::dsl::*;
-        let res = diesel::insert_into(users)
-            .values((
-                (name.eq(&self.name)),
-                age.eq(&self.age),
-                country_id.eq(&self.country_id),
-            ))
-            .get_result::<User>(self.connection);
-
-        match res {
-            Ok(x) => x,
-            Err(err) => panic!("{}", err),
-        }
     }
 }
 
