@@ -55,25 +55,25 @@ impl<'a> UserFactory<'a> {
         }
     }
 
-    fn country(mut self, association: &CountryAssociation) -> UserFactory<'a> {
-        self.country_id = Some(association.country_id());
+    fn country(mut self, association: &Association<Country>) -> UserFactory<'a> {
+        self.country_id = Some(association.id());
         self
     }
 }
 
-trait CountryAssociation {
-    fn country_id(&self) -> i32;
+trait Association<T> {
+    fn id(&self) -> i32;
 }
 
-impl<'a> CountryAssociation for CountryFactory<'a> {
-    fn country_id(&self) -> i32 {
+impl<'a> Association<Country> for CountryFactory<'a> {
+    fn id(&self) -> i32 {
         let country = self.insert();
         country.id
     }
 }
 
-impl CountryAssociation for Country {
-    fn country_id(&self) -> i32 {
+impl Association<Country> for Country {
+    fn id(&self) -> i32 {
         self.id
     }
 }
