@@ -35,6 +35,7 @@ pub struct User {
 #[derive(Factory)]
 #[factory_model(User)]
 #[table_name = "users"]
+// TODO, refactor this to support the syntax below
 // #[factory(table_name = users, model = User)]
 pub struct UserFactory<'a> {
     name: String,
@@ -53,11 +54,6 @@ impl<'a> UserFactory<'a> {
             country_id: None,
             connection: connection_in,
         }
-    }
-
-    fn country(mut self, association: &Association<Country>) -> UserFactory<'a> {
-        self.country_id = Some(association.id());
-        self
     }
 }
 
