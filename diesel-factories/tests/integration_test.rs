@@ -25,6 +25,7 @@ pub struct User {
 
 #[derive(Factory)]
 #[factory_model(User)]
+#[table_name = "users"]
 pub struct UserFactory<'a> {
     name: String,
     age: i32,

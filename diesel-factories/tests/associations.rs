@@ -34,9 +34,12 @@ pub struct User {
 
 #[derive(Factory)]
 #[factory_model(User)]
+#[table_name = "users"]
+// #[factory(table_name = users, model = User)]
 pub struct UserFactory<'a> {
     name: String,
     age: i32,
+    // #[factory(model = Country, factory = CountryFactory)]
     country_id: Option<i32>,
     connection: &'a PgConnection,
 }
@@ -81,6 +84,9 @@ pub struct Country {
     pub name: String,
 }
 
+#[derive(Factory)]
+#[factory_model(Country)]
+#[table_name = "countrys"]
 pub struct CountryFactory<'a> {
     name: String,
     connection: &'a PgConnection,
@@ -92,23 +98,6 @@ impl<'a> CountryFactory<'a> {
         CountryFactory {
             name: "USA".into(),
             connection: connection_in,
-        }
-    }
-
-    fn name(mut self, new_value: &str) -> CountryFactory<'a> {
-        self.name = new_value.to_string();
-        self
-    }
-
-    fn insert(&self) -> Country {
-        use self::countrys::dsl::*;
-        let res = diesel::insert_into(countrys)
-            .values(name.eq(&self.name))
-            .get_result::<Country>(self.connection);
-
-        match res {
-            Ok(x) => x,
-            Err(err) => panic!("{}", err),
         }
     }
 }

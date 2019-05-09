@@ -15,11 +15,12 @@ use syn::{parse_macro_input, Attribute, DeriveInput};
 use syn::{Data, Fields, FieldsNamed};
 
 /// See the docs for "diesel_factories" for more info about this.
-#[proc_macro_derive(Factory, attributes(factory_model))]
+#[proc_macro_derive(Factory, attributes(factory_model, table_name))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let model_name = model_name(&input.attrs);
+    let table_name = table_name(&input.attrs);
     let factory_name = input.ident.clone();
     let fields = struct_fields(input)
         .named
@@ -65,21 +66,41 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         #(#methods)*
 
 
-        fn insert(self) -> #model_name {
-            use self::users::dsl::*;
-            let res = diesel::insert_into(users)
+        fn insert(&self) -> #model_name {
+            use self::#table_name::dsl::*;
+            diesel::insert_into(#table_name)
                 .values(( #(#combined_diesel_tuples)* ))
-                .get_result::<#model_name>(self.connection);
-
-            match res {
-                Ok(x) => x,
-                Err(err) => panic!("{}", err),
-            }
+                .get_result::<#model_name>(self.connection).unwrap()
         }
     }
     };
     println!("{}", tokens);
     tokens.into()
+}
+
+fn table_name(attrs: &Vec<Attribute>) -> Ident {
+    let table_model_attr = attrs.into_iter().find(|attr| {
+        attr.path
+            .segments
+            .iter()
+            .any(|segment| &segment.ident.to_string() == "table_name")
+    });
+
+    let table_model_attr = match table_model_attr {
+        Some(x) => x,
+        None => {
+            panic!("#[derive(Factory)] requires you to also set the attribute #[table_name(...)]")
+        }
+    };
+
+    let attr = table_model_attr.tts.to_string();
+
+    let re = Regex::new(r"[a-z]+").unwrap();
+    let caps = re
+        .captures(&attr)
+        .expect("The `table_name` attributes must be on the form `#[table_name = \"...\"]`");
+
+    Ident::new(&caps[0].to_string(), Span::call_site())
 }
 
 fn model_name(attrs: &Vec<Attribute>) -> Ident {
