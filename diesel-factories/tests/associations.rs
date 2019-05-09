@@ -39,7 +39,7 @@ pub struct User {
 pub struct UserFactory<'a> {
     name: String,
     age: i32,
-    // #[factory(model = Country, factory = CountryFactory)]
+    #[factory(model = Country, factory = CountryFactory)]
     country_id: Option<i32>,
     connection: &'a PgConnection,
 }
@@ -63,19 +63,6 @@ impl<'a> UserFactory<'a> {
 
 trait Association<T> {
     fn id(&self) -> i32;
-}
-
-impl<'a> Association<Country> for CountryFactory<'a> {
-    fn id(&self) -> i32 {
-        let country = self.insert();
-        country.id
-    }
-}
-
-impl Association<Country> for Country {
-    fn id(&self) -> i32 {
-        self.id
-    }
 }
 
 #[derive(Queryable, Identifiable)]

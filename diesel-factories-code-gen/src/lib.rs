@@ -15,7 +15,7 @@ use syn::{parse_macro_input, Attribute, DeriveInput};
 use syn::{Data, Fields, FieldsNamed};
 
 /// See the docs for "diesel_factories" for more info about this.
-#[proc_macro_derive(Factory, attributes(factory_model, table_name))]
+#[proc_macro_derive(Factory, attributes(factory_model, table_name, factory))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -49,6 +49,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .clone()
         .filter_map(|field| {
             let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
+
             let ty = field.ty;
             if (name != "connection") {
                 Some(quote! {
@@ -57,6 +58,48 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             } else {
                 None
             }
+        })
+        .collect::<Vec<_>>();
+
+    let association_impls = fields
+        .clone()
+        .filter_map(|field| {
+            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
+            let ty = field.ty;
+            let maybe_factory_attr = field.attrs.into_iter().find(|attr| {
+                attr.path
+                    .segments
+                    .iter()
+                    .any(|segment| &segment.ident.to_string() == "factory")
+            });
+
+            if let Some(factory_attr) = maybe_factory_attr {
+                let attr = factory_attr.tts.to_string();
+                // FIXME, unicode is a valid identifier in rust!
+                let re = Regex::new(r"model = ([A-Za-z]+) ").unwrap();
+                let model_cap = re.captures(&attr).unwrap();
+                let re = Regex::new(r"factory = ([A-Za-z]+) ").unwrap();
+                let factory_cap = re.captures(&attr).unwrap();
+                let model = ident(&model_cap[1]);
+                let factory = ident(&factory_cap[1]);
+                return Some(quote! {
+
+                    impl<'a> Association<#model> for #factory<'a> {
+                        fn id(&self) -> i32 {
+                            self.insert().id
+                        }
+                    }
+
+                    impl Association<#model> for #model {
+                        fn id(&self) -> i32 {
+                            self.id
+                        }
+                    }
+
+                });
+            }
+
+            return None;
         })
         .collect::<Vec<_>>();
     let combined_diesel_tuples = quote! { #(#diesel_tuples),* };
@@ -73,6 +116,9 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 .get_result::<#model_name>(self.connection).unwrap()
         }
     }
+
+    #(#association_impls)*
+
     };
     println!("{}", tokens);
     tokens.into()

@@ -20,15 +20,10 @@
 //! For example this:
 //!
 
-#[macro_use]
 extern crate diesel;
 
-use diesel::backend::Backend;
-use diesel::backend::SupportsDefaultKeyword;
-use diesel::backend::SupportsReturningClause;
 use diesel::connection::Connection;
 use diesel::pg::Pg;
-use diesel::sql_types::HasSqlType;
 use lazy_static::lazy_static;
 use std::{
     default::Default,

@@ -50,7 +50,7 @@ fn basic_test() {
     // Connect to the database
     let database_url = "postgres://localhost/diesel_factories_test";
     let con = diesel::pg::PgConnection::establish(&database_url).unwrap();
-    con.begin_test_transaction();
+    con.begin_test_transaction().unwrap();
 
     // Create a new user using our factory, overriding the default name
     let user = UserFactory::new(&con).name("Alice").insert();
