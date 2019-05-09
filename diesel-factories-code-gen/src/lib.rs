@@ -4,8 +4,11 @@ extern crate proc_macro;
 extern crate proc_macro2;
 #[macro_use]
 extern crate diesel;
+
+extern crate heck;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use heck::SnakeCase;
 use proc_macro2::Span;
 use quote::quote;
 use regex::Regex;
@@ -58,6 +61,44 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             } else {
                 None
             }
+        })
+        .collect::<Vec<_>>();
+
+    let association_field_impls = fields
+        .clone()
+        .filter_map(|field| {
+            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
+            let ty = field.ty;
+            let maybe_factory_attr = field.attrs.into_iter().find(|attr| {
+                attr.path
+                    .segments
+                    .iter()
+                    .any(|segment| &segment.ident.to_string() == "factory")
+            });
+
+            if let Some(factory_attr) = maybe_factory_attr {
+                let attr = factory_attr.tts.to_string();
+                // FIXME, unicode is a valid identifier in rust!
+                let re = Regex::new(r"model = ([A-Za-z]+) ").unwrap();
+                let model_cap = re.captures(&attr).unwrap();
+                let re = Regex::new(r"factory = ([A-Za-z]+) ").unwrap();
+                let factory_cap = re.captures(&attr).unwrap();
+                let model = &model_cap[1];
+                let factory = ident(&factory_cap[1]);
+                let model_fn = ident(&model.to_snake_case());
+                let model = ident(model);
+                return Some(quote! {
+
+                    fn #model_fn(mut self, association: &Association<#model>) -> Self<'a> {
+                        self.#name = Some(association.id());
+                        self
+                    }
+
+
+                });
+            }
+
+            return None;
         })
         .collect::<Vec<_>>();
 
