@@ -84,6 +84,10 @@ pub trait InsertFactory<T> {
         Con: Connection<Backend = Pg>;
 }
 
+pub trait Association<T> {
+    fn id(&self) -> i32;
+}
+
 lazy_static! {
     static ref SEQUENCE_COUNTER: AtomicUsize = { AtomicUsize::new(0) };
 }

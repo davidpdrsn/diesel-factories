@@ -4,6 +4,7 @@ extern crate diesel_factories;
 
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel_factories::Association;
 use diesel_factories::Factory;
 
 // Tell Diesel what our schema is
@@ -55,10 +56,6 @@ impl<'a> UserFactory<'a> {
             connection: connection_in,
         }
     }
-}
-
-trait Association<T> {
-    fn id(&self) -> i32;
 }
 
 #[derive(Queryable, Identifiable)]
