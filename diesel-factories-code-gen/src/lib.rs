@@ -82,7 +82,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 let model = ident(model);
                 return Some(quote! {
 
-                    fn #model_fn(mut self, association: &Association<#model>) -> Self {
+                    fn #model_fn<T: Association<#model>>(mut self, association: &T) -> Self {
                         self.#name = Some(association.id());
                         self
                     }
