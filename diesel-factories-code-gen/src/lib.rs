@@ -169,7 +169,6 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     #(#association_impls)*
 
     };
-    println!("{}", tokens.clone().to_string());
     tokens.into()
 }
 
@@ -195,7 +194,7 @@ fn table_name(attrs: &Vec<Attribute>) -> Ident {
         .captures(&attr)
         .expect("The `table_name` attributes must be on the form `#[table_name = \"...\"]`");
 
-    Ident::new(&caps[0].to_string(), Span::call_site())
+    ident(&caps[0].to_string())
 }
 
 fn model_name(attrs: &Vec<Attribute>) -> Ident {
