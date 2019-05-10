@@ -84,7 +84,7 @@ pub trait InsertFactory<T> {
         Con: Connection<Backend = Pg>;
 }
 
-pub trait Association<T> {
+pub trait Association<T1, T2> {
     fn id(&self) -> i32;
 }
 
