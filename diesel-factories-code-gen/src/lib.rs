@@ -9,6 +9,7 @@ extern crate heck;
 use heck::SnakeCase;
 use proc_macro2::Span;
 use quote::quote;
+use quote::ToTokens;
 use regex::Regex;
 use syn::punctuated::Pair;
 use syn::Ident;
@@ -64,7 +65,11 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .clone()
         .filter_map(|field| {
             let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
-
+            let ty = field.ty;
+            let type_string = ty.into_token_stream().to_string();
+            let re = Regex::new(r"^Option < .* >$").unwrap();
+            let options = re.captures(&type_string);
+            let optional = options.is_some();
             let maybe_factory_attr = field.attrs.into_iter().find(|attr| {
                 attr.path
                     .segments
@@ -80,14 +85,26 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 let model = &model_cap[1];
                 let model_fn = ident(&model.to_snake_case());
                 let model = ident(model);
-                return Some(quote! {
 
-                    fn #model_fn<T: Association<#model>>(mut self, association: &T) -> Self {
-                        self.#name = Some(association.id());
-                        self
-                    }
+                if optional {
+                    return Some(quote! {
 
-                });
+                        fn #model_fn<T: Association<#model>>(mut self, association: &T) -> Self {
+                            self.#name = Some(association.id());
+                            self
+                        }
+
+                    });
+                } else {
+                    return Some(quote! {
+
+                        fn #model_fn<T: Association<#model>>(mut self, association: &T) -> Self {
+                            self.#name = association.id();
+                            self
+                        }
+
+                    });
+                }
             }
 
             return None;
@@ -152,6 +169,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     #(#association_impls)*
 
     };
+    println!("{}", tokens.clone().to_string());
     tokens.into()
 }
 

@@ -24,6 +24,14 @@ table! {
     }
 }
 
+table! {
+    cities (id) {
+        id -> Integer,
+        name -> Text,
+        country_id -> Integer,
+    }
+}
+
 // Setup the model. We have to implement `Identifiable`.
 #[derive(Queryable, Identifiable)]
 pub struct User {
@@ -82,6 +90,35 @@ impl<'a> CountryFactory<'a> {
     }
 }
 
+#[derive(Queryable, Identifiable)]
+#[table_name = "cities"]
+pub struct City {
+    pub id: i32,
+    pub name: String,
+    pub country_id: i32,
+}
+
+#[derive(Factory)]
+#[factory_model(City)]
+#[table_name = "cities"]
+pub struct CityFactory<'a> {
+    name: String,
+    #[factory(model = Country, factory = CountryFactory)]
+    country_id: i32,
+    connection: &'a PgConnection,
+}
+
+impl<'a> CityFactory<'a> {
+    // Set default values here
+    fn new(connection_in: &'a PgConnection) -> CityFactory<'a> {
+        CityFactory {
+            name: "New York".into(),
+            country_id: -1,
+            connection: connection_in,
+        }
+    }
+}
+
 #[test]
 fn creating_user() {
     let con = setup();
@@ -128,6 +165,34 @@ fn creating_user_and_country_with_builder() {
         find_country_by_id(alice_db.country_id.unwrap(), &con).name,
         "USA"
     );
+}
+#[test]
+fn creating_city_and_country_with_literal() {
+    let con = setup();
+    let country = CountryFactory::new(&con).name("USA").insert();
+
+    let ny = CityFactory::new(&con)
+        .name("New York")
+        .country(&country)
+        .insert();
+
+    let ny_db = find_city_by_id(ny.id, &con);
+
+    assert_eq!(ny_db.name, "New York");
+    assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
+}
+#[test]
+fn creating_city_and_country_with_builder() {
+    let con = setup();
+
+    let ny = CityFactory::new(&con)
+        .name("New York")
+        .country(&CountryFactory::new(&con).name("USA"))
+        .insert();
+
+    let ny_db = find_city_by_id(ny.id, &con);
+    assert_eq!(ny_db.name, "New York");
+    assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
 }
 
 #[test]
@@ -206,6 +271,11 @@ fn setup() -> PgConnection {
 fn find_user_by_id(input: i32, con: &PgConnection) -> User {
     use self::users::dsl::*;
     users.filter(id.eq(input)).first::<User>(con).unwrap()
+}
+
+fn find_city_by_id(input: i32, con: &PgConnection) -> City {
+    use self::cities::dsl::*;
+    cities.filter(id.eq(input)).first::<City>(con).unwrap()
 }
 
 fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
