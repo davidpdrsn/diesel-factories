@@ -89,7 +89,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 if optional {
                     return Some(quote! {
 
-                        fn #model_fn<T: Association<#model_name, #model>>(mut self, association: &T) -> Self {
+                        fn #model_fn<T: diesel_factories::Association<#model_name, #model>>(mut self, association: &T) -> Self {
                             self.#name = Some(association.id());
                             self
                         }
@@ -98,7 +98,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 } else {
                     return Some(quote! {
 
-                        fn #model_fn<T: Association<#model_name, #model>>(mut self, association: &T) -> Self {
+                        fn #model_fn<T: diesel_factories::Association<#model_name, #model>>(mut self, association: &T) -> Self {
                             self.#name = association.id();
                             self
                         }
@@ -132,13 +132,13 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 let factory = ident(&factory_cap[1]);
                 return Some(quote! {
 
-                    impl<'a> Association<#model_name, #model> for #factory<'a> {
+                    impl<'a> diesel_factories::Association<#model_name, #model> for #factory<'a> {
                         fn id(&self) -> i32 {
                             self.insert().id
                         }
                     }
 
-                    impl Association<#model_name, #model> for #model {
+                    impl diesel_factories::Association<#model_name, #model> for #model {
                         fn id(&self) -> i32 {
                             self.id
                         }
