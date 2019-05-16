@@ -1,9 +1,10 @@
+#![allow(proc_macro_derive_resolution_fallback)]
+
 #[macro_use]
 extern crate diesel;
 
 use diesel::{pg::PgConnection, prelude::*};
-use diesel_factories::{Association, Factory};
-use schema::{countries, users};
+use diesel_factories::{Association, Factory, FactoryMethods};
 
 mod schema {
     table! {
@@ -11,7 +12,7 @@ mod schema {
             id -> Integer,
             name -> Text,
             age -> Integer,
-            country_id -> Integer,
+            country_id -> Nullable<Integer>,
         }
     }
 
@@ -21,6 +22,14 @@ mod schema {
             name -> Text,
         }
     }
+
+    table! {
+        cities (id) {
+            id -> Integer,
+            name -> Text,
+            country_id -> Integer,
+        }
+    }
 }
 
 #[derive(Queryable, Clone)]
@@ -28,7 +37,7 @@ struct User {
     pub id: i32,
     pub name: String,
     pub age: i32,
-    pub country_id: i32,
+    pub country_id: Option<i32>,
 }
 
 #[derive(Queryable, Clone)]
@@ -37,13 +46,19 @@ struct Country {
     pub name: String,
 }
 
-// -- factories ------------
+#[derive(Queryable, Clone)]
+struct City {
+    pub id: i32,
+    pub name: String,
+    pub country_id: i32,
+}
 
-#[derive(Clone)]
+#[derive(Clone, Factory)]
+#[factory(model = "User", table = "crate::schema::users")]
 struct UserFactory<'a> {
     pub name: String,
     pub age: i32,
-    pub country: Association<'a, Country, CountryFactory>,
+    pub country: Option<Association<'a, Country, CountryFactory>>,
 }
 
 impl<'a> Default for UserFactory<'a> {
@@ -51,12 +66,13 @@ impl<'a> Default for UserFactory<'a> {
         Self {
             name: "Bob".into(),
             age: 30,
-            country: Association::default(),
+            country: None,
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Factory)]
+#[factory(model = "Country", table = "crate::schema::countries")]
 struct CountryFactory {
     pub name: String,
 }
@@ -69,74 +85,19 @@ impl Default for CountryFactory {
     }
 }
 
-// -- macro ----------------
-
-impl<'a> Factory for UserFactory<'a> {
-    type Model = User;
-    type Id = i32;
-    type Connection = PgConnection;
-
-    fn insert(self, con: &Self::Connection) -> Self::Model {
-        use crate::schema::users;
-        use diesel::prelude::*;
-        let values = (
-            (users::name.eq(&self.name)),
-            (users::age.eq(&self.age)),
-            (users::country_id.eq(self.country.insert_returning_id(con))),
-        );
-        diesel::insert_into(users::table)
-            .values(values)
-            .get_result::<Self::Model>(con)
-            .unwrap()
-    }
-
-    fn id_for_model(model: &Self::Model) -> &Self::Id {
-        &model.id
-    }
+#[derive(Clone, Factory)]
+#[factory(model = "City", table = "crate::schema::cities")]
+struct CityFactory<'a> {
+    pub name: String,
+    pub country: Association<'a, Country, CountryFactory>,
 }
 
-trait SetCountryOnUserFactory<T> {
-    fn country(self, t: T) -> Self;
-}
-
-impl<'a> SetCountryOnUserFactory<&'a Country> for UserFactory<'a> {
-    fn country(mut self, country: &'a Country) -> Self {
-        self.country = Association::new_model(country);
-        self
-    }
-}
-
-impl<'a> SetCountryOnUserFactory<CountryFactory> for UserFactory<'a> {
-    fn country(mut self, factory: CountryFactory) -> Self {
-        self.country = Association::new_factory(factory);
-        self
-    }
-}
-
-impl CountryFactory {
-    fn name<T: Into<String>>(mut self, t: T) -> Self {
-        self.name = t.into();
-        self
-    }
-}
-
-impl Factory for CountryFactory {
-    type Model = Country;
-    type Id = i32;
-    type Connection = PgConnection;
-
-    fn insert(self, con: &Self::Connection) -> Self::Model {
-        use crate::schema::countries;
-        use diesel::prelude::*;
-        let values = (countries::name.eq(&self.name));
-        diesel::insert_into(countries::table)
-            .values(values)
-            .get_result::<Self::Model>(con)
-            .unwrap()
-    }
-
-    fn id_for_model(model: &Self::Model) -> &Self::Id {
-        &model.id
+impl<'a> Default for CityFactory<'a> {
+    fn default() -> Self {
+        Self {
+            name: "Copenhagen".into(),
+            country: Association::default(),
+        }
     }
 }
 
@@ -144,12 +105,12 @@ impl Factory for CountryFactory {
 fn insert_one_user() {
     let con = setup();
 
-    let user = UserFactory::default().insert(&con);
+    let user = UserFactory::default().name("Alice").insert(&con);
 
-    assert_eq!(user.name, "Bob");
+    assert_eq!(user.name, "Alice");
     assert_eq!(user.age, 30);
     assert_eq!(1, count_users(&con));
-    assert_eq!(1, count_countries(&con));
+    assert_eq!(0, count_countries(&con));
 }
 
 #[test]
@@ -160,7 +121,7 @@ fn overriding_country() {
         .country(CountryFactory::default().name("USA"))
         .insert(&con);
 
-    let country = find_country_by_id(bob.country_id, &con);
+    let country = find_country_by_id(bob.country_id.unwrap(), &con);
 
     assert_eq!("USA", country.name);
     assert_eq!(1, count_users(&con));
