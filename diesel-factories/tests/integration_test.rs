@@ -7,16 +7,17 @@ use diesel::prelude::*;
 use diesel_factories::Factory;
 
 // Tell Diesel what our schema is
-table! {
-    users (id) {
-        id -> Integer,
-        name -> Text,
-        age -> Integer,
+mod schema {
+    table! {
+        users (id) {
+            id -> Integer,
+            name -> Text,
+            age -> Integer,
+        }
     }
 }
 
-// Setup the model. We have to implement `Identifiable`.
-#[derive(Queryable, Identifiable)]
+#[derive(Queryable)]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -45,7 +46,7 @@ impl<'a> UserFactory<'a> {
 
 #[test]
 fn basic_test() {
-    use self::users::dsl::*;
+    use crate::schema::users::dsl::*;
 
     // Connect to the database
     let database_url = "postgres://localhost/diesel_factories_test";

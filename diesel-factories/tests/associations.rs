@@ -8,32 +8,33 @@ use diesel_factories::Association;
 use diesel_factories::Factory;
 
 // Tell Diesel what our schema is
-table! {
-    users (id) {
-        id -> Integer,
-        name -> Text,
-        age -> Integer,
-        country_id -> Nullable<Integer>,
+mod schema {
+    table! {
+        users (id) {
+            id -> Integer,
+            name -> Text,
+            age -> Integer,
+            country_id -> Nullable<Integer>,
+        }
+    }
+
+    table! {
+        countries (id) {
+            id -> Integer,
+            name -> Text,
+        }
+    }
+
+    table! {
+        cities (id) {
+            id -> Integer,
+            name -> Text,
+            country_id -> Integer,
+        }
     }
 }
 
-table! {
-    countrys (id) {
-        id -> Integer,
-        name -> Text,
-    }
-}
-
-table! {
-    cities (id) {
-        id -> Integer,
-        name -> Text,
-        country_id -> Integer,
-    }
-}
-
-// Setup the model. We have to implement `Identifiable`.
-#[derive(Queryable, Identifiable)]
+#[derive(Queryable)]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -55,7 +56,6 @@ pub struct UserFactory<'a> {
 }
 
 impl<'a> UserFactory<'a> {
-    // Set default values here
     fn new(connection_in: &'a PgConnection) -> UserFactory<'a> {
         UserFactory {
             name: "Bob".into(),
@@ -66,7 +66,7 @@ impl<'a> UserFactory<'a> {
     }
 }
 
-#[derive(Queryable, Identifiable)]
+#[derive(Queryable)]
 pub struct Country {
     pub id: i32,
     pub name: String,
@@ -74,7 +74,7 @@ pub struct Country {
 
 #[derive(Factory)]
 #[factory_model(Country)]
-#[table_name = "countrys"]
+#[table_name = "countries"]
 pub struct CountryFactory<'a> {
     name: String,
     connection: &'a PgConnection,
@@ -90,8 +90,7 @@ impl<'a> CountryFactory<'a> {
     }
 }
 
-#[derive(Queryable, Identifiable)]
-#[table_name = "cities"]
+#[derive(Queryable)]
 pub struct City {
     pub id: i32,
     pub name: String,
@@ -197,7 +196,7 @@ fn creating_city_and_country_with_builder() {
 
 #[test]
 fn create_two_users_with_the_same_country() {
-    use self::countrys;
+    use crate::schema::countries;
     use diesel::dsl::count_star;
     let con = setup();
 
@@ -222,12 +221,12 @@ fn create_two_users_with_the_same_country() {
         find_country_by_id(bob.country_id.unwrap(), &con).id,
         find_country_by_id(alice.country_id.unwrap(), &con).id
     );
-    assert_eq!(Ok(1), countrys::table.select(count_star()).first(&con));
+    assert_eq!(Ok(1), countries::table.select(count_star()).first(&con));
 }
 
 #[test]
-fn create_two_users_with_distinct_countrys_from_the_same_builder() {
-    use self::countrys;
+fn create_two_users_with_distinct_countries_from_the_same_builder() {
+    use crate::schema::countries;
     use diesel::dsl::count_star;
     let con = setup();
 
@@ -258,7 +257,7 @@ fn create_two_users_with_distinct_countrys_from_the_same_builder() {
         find_country_by_id(bob.country_id.unwrap(), &con).id,
         find_country_by_id(alice.country_id.unwrap(), &con).id
     );
-    assert_eq!(Ok(2), countrys::table.select(count_star()).first(&con));
+    assert_eq!(Ok(2), countries::table.select(count_star()).first(&con));
 }
 
 fn setup() -> PgConnection {
@@ -269,18 +268,18 @@ fn setup() -> PgConnection {
 }
 
 fn find_user_by_id(input: i32, con: &PgConnection) -> User {
-    use self::users::dsl::*;
+    use crate::schema::users::dsl::*;
     users.filter(id.eq(input)).first::<User>(con).unwrap()
 }
 
 fn find_city_by_id(input: i32, con: &PgConnection) -> City {
-    use self::cities::dsl::*;
+    use crate::schema::cities::dsl::*;
     cities.filter(id.eq(input)).first::<City>(con).unwrap()
 }
 
 fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
-    use self::countrys::dsl::*;
-    countrys
+    use crate::schema::countries::dsl::*;
+    countries
         .filter(id.eq(&input))
         .first::<Country>(con)
         .unwrap()

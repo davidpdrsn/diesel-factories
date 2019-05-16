@@ -159,7 +159,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
             #(#association_field_impls)*
 
             fn insert(&self) -> #model_name {
-                use self::#table_name::dsl::*;
+                use crate::schema::#table_name::dsl::*;
                 diesel::insert_into(#table_name)
                     .values(( #(#combined_diesel_tuples)* ))
                     .get_result::<#model_name>(self.connection).unwrap()

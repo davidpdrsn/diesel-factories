@@ -1,3 +1,2 @@
-DROP TABLE countrys;
-ALTER TABLE users
-DROP COLUMN country_id;
+DROP TABLE countries;
+ALTER TABLE users DROP COLUMN country_id;
