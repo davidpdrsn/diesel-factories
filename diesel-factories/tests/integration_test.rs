@@ -1,22 +1,17 @@
-#![allow(proc_macro_derive_resolution_fallback)]
-
 #[macro_use]
 extern crate diesel;
-extern crate diesel_factories;
 
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel_factories::Association;
-use diesel_factories::Factory;
+use diesel::{pg::PgConnection, prelude::*};
+use diesel_factories::{Association, Factory};
+use schema::{countries, users};
 
-// Tell Diesel what our schema is
 mod schema {
     table! {
         users (id) {
             id -> Integer,
             name -> Text,
             age -> Integer,
-            country_id -> Nullable<Integer>,
+            country_id -> Integer,
         }
     }
 
@@ -26,240 +21,163 @@ mod schema {
             name -> Text,
         }
     }
-
-    table! {
-        cities (id) {
-            id -> Integer,
-            name -> Text,
-            country_id -> Integer,
-        }
-    }
 }
 
-#[derive(Queryable)]
-pub struct User {
+#[derive(Queryable, Clone)]
+struct User {
     pub id: i32,
     pub name: String,
     pub age: i32,
-    pub country_id: Option<i32>,
-}
-
-#[derive(Factory)]
-#[factory_model(User)]
-#[table_name = "users"]
-// TODO, refactor this to support the syntax below
-// #[factory(table_name = users, model = User)]
-pub struct UserFactory<'a> {
-    name: String,
-    age: i32,
-    #[factory(model = Country, factory = CountryFactory)]
-    country_id: Option<i32>,
-    connection: &'a PgConnection,
-}
-
-impl<'a> UserFactory<'a> {
-    fn new(connection_in: &'a PgConnection) -> UserFactory<'a> {
-        UserFactory {
-            name: "Bob".into(),
-            age: 30,
-            country_id: None,
-            connection: connection_in,
-        }
-    }
-}
-
-#[derive(Queryable)]
-pub struct Country {
-    pub id: i32,
-    pub name: String,
-}
-
-#[derive(Factory)]
-#[factory_model(Country)]
-#[table_name = "countries"]
-pub struct CountryFactory<'a> {
-    name: String,
-    connection: &'a PgConnection,
-}
-
-impl<'a> CountryFactory<'a> {
-    // Set default values here
-    fn new(connection_in: &'a PgConnection) -> CountryFactory<'a> {
-        CountryFactory {
-            name: "USA".into(),
-            connection: connection_in,
-        }
-    }
-}
-
-#[derive(Queryable)]
-pub struct City {
-    pub id: i32,
-    pub name: String,
     pub country_id: i32,
 }
 
-#[derive(Factory)]
-#[factory_model(City)]
-#[table_name = "cities"]
-pub struct CityFactory<'a> {
-    name: String,
-    #[factory(model = Country, factory = CountryFactory)]
-    country_id: i32,
-    connection: &'a PgConnection,
+#[derive(Queryable, Clone)]
+struct Country {
+    pub id: i32,
+    pub name: String,
 }
 
-impl<'a> CityFactory<'a> {
-    // Set default values here
-    fn new(connection_in: &'a PgConnection) -> CityFactory<'a> {
-        CityFactory {
-            name: "New York".into(),
-            country_id: -1,
-            connection: connection_in,
+// -- factories ------------
+
+#[derive(Clone)]
+struct UserFactory<'a> {
+    pub name: String,
+    pub age: i32,
+    pub country: Association<'a, Country, CountryFactory>,
+}
+
+impl<'a> Default for UserFactory<'a> {
+    fn default() -> Self {
+        Self {
+            name: "Bob".into(),
+            age: 30,
+            country: Association::default(),
         }
     }
 }
 
-#[test]
-fn creating_user() {
-    let con = setup();
-    let alice = UserFactory::new(&con).name("Alice").insert();
-    let bob = UserFactory::new(&con).name("Bob").insert();
-
-    assert_eq!(bob.name, "Bob");
-    assert_eq!(alice.name, "Alice");
-    assert_ne!(alice.id, bob.id);
-
-    assert_eq!(find_user_by_id(bob.id, &con).name, "Bob");
-    assert_eq!(find_user_by_id(alice.id, &con).name, "Alice");
-}
-#[test]
-fn creating_user_and_country_with_literal() {
-    let con = setup();
-    let country = CountryFactory::new(&con).name("USA").insert();
-
-    let alice = UserFactory::new(&con)
-        .name("Alice")
-        .country(&country)
-        .insert();
-
-    let alice_db = find_user_by_id(alice.id, &con);
-
-    assert_eq!(alice_db.name, "Alice");
-    assert_eq!(
-        find_country_by_id(alice_db.country_id.unwrap(), &con).name,
-        "USA"
-    );
-}
-#[test]
-fn creating_user_and_country_with_builder() {
-    let con = setup();
-
-    let alice = UserFactory::new(&con)
-        .name("Alice")
-        .country(&CountryFactory::new(&con).name("USA"))
-        .insert();
-
-    let alice_db = find_user_by_id(alice.id, &con);
-    assert_eq!(alice_db.name, "Alice");
-    assert_eq!(
-        find_country_by_id(alice_db.country_id.unwrap(), &con).name,
-        "USA"
-    );
-}
-#[test]
-fn creating_city_and_country_with_literal() {
-    let con = setup();
-    let country = CountryFactory::new(&con).name("USA").insert();
-
-    let ny = CityFactory::new(&con)
-        .name("New York")
-        .country(&country)
-        .insert();
-
-    let ny_db = find_city_by_id(ny.id, &con);
-
-    assert_eq!(ny_db.name, "New York");
-    assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
-}
-#[test]
-fn creating_city_and_country_with_builder() {
-    let con = setup();
-
-    let ny = CityFactory::new(&con)
-        .name("New York")
-        .country(&CountryFactory::new(&con).name("USA"))
-        .insert();
-
-    let ny_db = find_city_by_id(ny.id, &con);
-    assert_eq!(ny_db.name, "New York");
-    assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
+#[derive(Clone)]
+struct CountryFactory {
+    pub name: String,
 }
 
+impl Default for CountryFactory {
+    fn default() -> Self {
+        Self {
+            name: "Denmark".into(),
+        }
+    }
+}
+
+// -- macro ----------------
+
+impl<'a> Factory for UserFactory<'a> {
+    type Model = User;
+    type Id = i32;
+    type Connection = PgConnection;
+
+    fn insert(self, con: &Self::Connection) -> Self::Model {
+        use crate::schema::users;
+        use diesel::prelude::*;
+        let values = (
+            (users::name.eq(&self.name)),
+            (users::age.eq(&self.age)),
+            (users::country_id.eq(self.country.insert_returning_id(con))),
+        );
+        diesel::insert_into(users::table)
+            .values(values)
+            .get_result::<Self::Model>(con)
+            .unwrap()
+    }
+
+    fn id_for_model(model: &Self::Model) -> &Self::Id {
+        &model.id
+    }
+}
+
+trait SetCountryOnUserFactory<T> {
+    fn country(self, t: T) -> Self;
+}
+
+impl<'a> SetCountryOnUserFactory<&'a Country> for UserFactory<'a> {
+    fn country(mut self, country: &'a Country) -> Self {
+        self.country = Association::new_model(country);
+        self
+    }
+}
+
+impl<'a> SetCountryOnUserFactory<CountryFactory> for UserFactory<'a> {
+    fn country(mut self, factory: CountryFactory) -> Self {
+        self.country = Association::new_factory(factory);
+        self
+    }
+}
+
+impl CountryFactory {
+    fn name<T: Into<String>>(mut self, t: T) -> Self {
+        self.name = t.into();
+        self
+    }
+}
+
+impl Factory for CountryFactory {
+    type Model = Country;
+    type Id = i32;
+    type Connection = PgConnection;
+
+    fn insert(self, con: &Self::Connection) -> Self::Model {
+        use crate::schema::countries;
+        use diesel::prelude::*;
+        let values = (countries::name.eq(&self.name));
+        diesel::insert_into(countries::table)
+            .values(values)
+            .get_result::<Self::Model>(con)
+            .unwrap()
+    }
+
+    fn id_for_model(model: &Self::Model) -> &Self::Id {
+        &model.id
+    }
+}
+
 #[test]
-fn create_two_users_with_the_same_country() {
-    use crate::schema::countries;
-    use diesel::dsl::count_star;
+fn insert_one_user() {
     let con = setup();
 
-    let country = CountryFactory::new(&con).name("USA").insert();
+    let user = UserFactory::default().insert(&con);
 
-    let bob = UserFactory::new(&con)
-        .name("Bob")
-        .country(&country)
-        .insert();
+    assert_eq!(user.name, "Bob");
+    assert_eq!(user.age, 30);
+    assert_eq!(1, count_users(&con));
+    assert_eq!(1, count_countries(&con));
+}
 
-    let alice = UserFactory::new(&con)
-        .name("Alice")
-        .country(&country)
-        .insert();
+#[test]
+fn overriding_country() {
+    let con = setup();
 
-    assert_eq!(
-        find_country_by_id(bob.country_id.unwrap(), &con).name,
-        "USA"
-    );
+    let bob = UserFactory::default()
+        .country(CountryFactory::default().name("USA"))
+        .insert(&con);
+
+    let country = find_country_by_id(bob.country_id, &con);
+
+    assert_eq!("USA", country.name);
+    assert_eq!(1, count_users(&con));
+    assert_eq!(1, count_countries(&con));
+}
+
+#[test]
+fn insert_two_users_sharing_country() {
+    let con = setup();
+
+    let country = CountryFactory::default().insert(&con);
+    let bob = UserFactory::default().country(&country).insert(&con);
+    let alice = UserFactory::default().country(&country).insert(&con);
+
     assert_eq!(bob.country_id, alice.country_id);
-    assert_eq!(
-        find_country_by_id(bob.country_id.unwrap(), &con).id,
-        find_country_by_id(alice.country_id.unwrap(), &con).id
-    );
-    assert_eq!(Ok(1), countries::table.select(count_star()).first(&con));
-}
-
-#[test]
-fn create_two_users_with_distinct_countries_from_the_same_builder() {
-    use crate::schema::countries;
-    use diesel::dsl::count_star;
-    let con = setup();
-
-    let country_factory = CountryFactory::new(&con).name("USA");
-
-    let bob = UserFactory::new(&con)
-        .name("Bob")
-        .country(&country_factory)
-        .insert();
-
-    // Imagine there are other useful properties set up on this builder
-    let country_factory = country_factory.name("Canada");
-    let alice = UserFactory::new(&con)
-        .name("Alice")
-        .country(&country_factory)
-        .insert();
-
-    assert_eq!(
-        find_country_by_id(bob.country_id.unwrap(), &con).name,
-        "USA"
-    );
-    assert_eq!(
-        find_country_by_id(alice.country_id.unwrap(), &con).name,
-        "Canada"
-    );
-    assert_ne!(bob.country_id, alice.country_id);
-    assert_ne!(
-        find_country_by_id(bob.country_id.unwrap(), &con).id,
-        find_country_by_id(alice.country_id.unwrap(), &con).id
-    );
-    assert_eq!(Ok(2), countries::table.select(count_star()).first(&con));
+    assert_eq!(2, count_users(&con));
+    assert_eq!(1, count_countries(&con));
 }
 
 fn setup() -> PgConnection {
@@ -269,14 +187,16 @@ fn setup() -> PgConnection {
     con
 }
 
-fn find_user_by_id(input: i32, con: &PgConnection) -> User {
-    use crate::schema::users::dsl::*;
-    users.filter(id.eq(input)).first::<User>(con).unwrap()
+fn count_users(con: &PgConnection) -> i64 {
+    use crate::schema::users;
+    use diesel::dsl::count_star;
+    users::table.select(count_star()).first(con).unwrap()
 }
 
-fn find_city_by_id(input: i32, con: &PgConnection) -> City {
-    use crate::schema::cities::dsl::*;
-    cities.filter(id.eq(input)).first::<City>(con).unwrap()
+fn count_countries(con: &PgConnection) -> i64 {
+    use crate::schema::countries;
+    use diesel::dsl::count_star;
+    countries::table.select(count_star()).first(con).unwrap()
 }
 
 fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
