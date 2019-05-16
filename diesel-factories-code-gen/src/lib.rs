@@ -29,13 +29,17 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .map(|pair| match pair {
             Pair::Punctuated(field, _) => field,
             Pair::End(field) => field,
-        });
+        })
+        .collect::<Vec<_>>();
 
     let methods = fields
-        .clone()
+        .iter()
         .map(|field| {
-            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
-            let ty = field.ty;
+            let name = field
+                .ident
+                .as_ref()
+                .unwrap_or_else(|| panic!("Field without name"));
+            let ty = &field.ty;
             quote! {
                 #[allow(missing_docs)]
                 pub fn #name<T: Into<#ty>>(mut self, value: T) -> Self {
@@ -47,9 +51,12 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .collect::<Vec<_>>();
 
     let diesel_tuples = fields
-        .clone()
+        .iter()
         .filter_map(|field| {
-            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
+            let name = field
+                .ident
+                .as_ref()
+                .unwrap_or_else(|| panic!("Field without name"));
 
             if name != "connection" {
                 Some(quote! {
@@ -62,15 +69,15 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .collect::<Vec<_>>();
 
     let association_field_impls = fields
-        .clone()
+        .iter()
         .filter_map(|field| {
-            let name = field.ident.unwrap_or_else(|| panic!("Field without name"));
-            let ty = field.ty;
+            let name = field.ident.as_ref().unwrap_or_else(|| panic!("Field without name"));
+            let ty = &field.ty;
             let type_string = ty.into_token_stream().to_string();
             let re = Regex::new(r"^Option < .* >$").unwrap();
             let options = re.captures(&type_string);
             let optional = options.is_some();
-            let maybe_factory_attr = field.attrs.into_iter().find(|attr| {
+            let maybe_factory_attr = field.attrs.iter().find(|attr| {
                 attr.path
                     .segments
                     .iter()
@@ -88,21 +95,17 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
                 if optional {
                     return Some(quote! {
-
                         fn #model_fn<T: diesel_factories::Association<#model_name, #model>>(mut self, association: &T) -> Self {
                             self.#name = Some(association.id());
                             self
                         }
-
                     });
                 } else {
                     return Some(quote! {
-
                         fn #model_fn<T: diesel_factories::Association<#model_name, #model>>(mut self, association: &T) -> Self {
                             self.#name = association.id();
                             self
                         }
-
                     });
                 }
             }
@@ -112,9 +115,9 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .collect::<Vec<_>>();
 
     let association_impls = fields
-        .clone()
+        .iter()
         .filter_map(|field| {
-            let maybe_factory_attr = field.attrs.into_iter().find(|attr| {
+            let maybe_factory_attr = field.attrs.iter().find(|attr| {
                 attr.path
                     .segments
                     .iter()
@@ -131,7 +134,6 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                 let model = ident(&model_cap[1]);
                 let factory = ident(&factory_cap[1]);
                 return Some(quote! {
-
                     impl<'a> diesel_factories::Association<#model_name, #model> for #factory<'a> {
                         fn id(&self) -> i32 {
                             self.insert().id
@@ -143,7 +145,6 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
                             self.id
                         }
                     }
-
                 });
             }
 
@@ -152,22 +153,20 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         .collect::<Vec<_>>();
     let combined_diesel_tuples = quote! { #(#diesel_tuples),* };
     let tokens = quote! {
-    impl<'a> #factory_name<'a> {
+        impl<'a> #factory_name<'a> {
+            #(#methods)*
 
-        #(#methods)*
+            #(#association_field_impls)*
 
-        #(#association_field_impls)*
-
-        fn insert(&self) -> #model_name {
-            use self::#table_name::dsl::*;
-            diesel::insert_into(#table_name)
-                .values(( #(#combined_diesel_tuples)* ))
-                .get_result::<#model_name>(self.connection).unwrap()
+            fn insert(&self) -> #model_name {
+                use self::#table_name::dsl::*;
+                diesel::insert_into(#table_name)
+                    .values(( #(#combined_diesel_tuples)* ))
+                    .get_result::<#model_name>(self.connection).unwrap()
+            }
         }
-    }
 
-    #(#association_impls)*
-
+        #(#association_impls)*
     };
     tokens.into()
 }
