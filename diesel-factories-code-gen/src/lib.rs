@@ -28,7 +28,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 struct Options {
     model: syn::Ident,
     #[darling(default)]
-    connection: Option<syn::Ident>,
+    connection: Option<syn::Path>,
     #[darling(default)]
     id: Option<syn::Ident>,
     table: syn::Path,
@@ -213,7 +213,8 @@ impl DeriveData {
             None
         } else {
             Some(quote! {
-                fn #name<T: Into<#ty>>(mut self, t: T) -> Self {
+                #[allow(missing_docs, dead_code)]
+                pub fn #name<T: Into<#ty>>(mut self, t: T) -> Self {
                     self.#name = t.into();
                     self
                 }
@@ -265,7 +266,8 @@ impl DeriveData {
             };
 
             let mut out = quote! {
-                trait #trait_name<T> {
+                #[allow(missing_docs, dead_code)]
+                pub trait #trait_name<T> {
                     fn #field_name(self, t: T) -> Self;
                 }
 

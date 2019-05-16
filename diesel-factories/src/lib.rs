@@ -12,6 +12,9 @@
     unused_qualifications
 )]
 
+use lazy_static::lazy_static;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 pub use diesel_factories_code_gen::Factory;
 
 /// TODO
@@ -72,4 +75,28 @@ pub trait FactoryMethods {
 
     /// TODO
     fn id_for_model(model: &Self::Model) -> &Self::Id;
+}
+
+lazy_static! {
+    static ref SEQUENCE_COUNTER: AtomicUsize = { AtomicUsize::new(0) };
+}
+
+/// Utility function for generating unique ids or strings in factories.
+/// Each time `sequence` gets called, the closure will receive a different number.
+///
+/// ```
+/// use diesel_factories::sequence;
+///
+/// assert_ne!(
+///     sequence(|i| format!("unique-string-{}", i)),
+///     sequence(|i| format!("unique-string-{}", i)),
+/// );
+/// ```
+pub fn sequence<T, F>(f: F) -> T
+where
+    F: Fn(usize) -> T,
+{
+    SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let count = SEQUENCE_COUNTER.load(Ordering::Relaxed);
+    f(count)
 }

@@ -54,7 +54,11 @@ struct City {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "User", table = "crate::schema::users")]
+#[factory(
+    model = "User",
+    table = "crate::schema::users",
+    connection = "diesel::pg::PgConnection"
+)]
 struct UserFactory<'a> {
     pub name: String,
     pub age: i32,
