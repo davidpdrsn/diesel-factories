@@ -114,7 +114,7 @@ impl<'a> CityFactory<'a> {
     fn new(connection_in: &'a PgConnection) -> CityFactory<'a> {
         CityFactory {
             name: "New York".into(),
-            country_id: -1,
+            country_id: CountryFactory::new(connection_in).insert().id,
             connection: connection_in,
         }
     }
@@ -182,6 +182,7 @@ fn creating_city_and_country_with_literal() {
     assert_eq!(ny_db.name, "New York");
     assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
 }
+
 #[test]
 fn creating_city_and_country_with_builder() {
     let con = setup();
@@ -194,6 +195,21 @@ fn creating_city_and_country_with_builder() {
     let ny_db = find_city_by_id(ny.id, &con);
     assert_eq!(ny_db.name, "New York");
     assert_eq!(find_country_by_id(ny_db.country_id, &con).name, "USA");
+}
+
+#[test]
+fn does_not_create_too_many_cities() {
+    use crate::schema::{cities, countries};
+    use diesel::dsl::count_star;
+
+    let con = setup();
+
+    let ny = CityFactory::new(&con)
+        .country(&CountryFactory::new(&con))
+        .insert();
+
+    assert_eq!(Ok(1), cities::table.select(count_star()).first(&con));
+    assert_eq!(Ok(1), countries::table.select(count_star()).first(&con));
 }
 
 #[test]
