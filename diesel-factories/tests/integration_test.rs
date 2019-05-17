@@ -13,6 +13,8 @@ mod schema {
             name -> Text,
             age -> Integer,
             country_id -> Nullable<Integer>,
+            home_city_id -> Nullable<Integer>,
+            current_city_id -> Nullable<Integer>,
         }
     }
 
@@ -38,6 +40,8 @@ struct User {
     pub name: String,
     pub age: i32,
     pub country_id: Option<i32>,
+    pub home_city_id: Option<i32>,
+    pub current_city_id: Option<i32>,
 }
 
 #[derive(Queryable, Clone)]
@@ -63,6 +67,8 @@ struct UserFactory<'a> {
     pub name: String,
     pub age: i32,
     pub country: Option<Association<'a, Country, CountryFactory>>,
+    pub home_city: Option<Association<'a, City, CityFactory<'a>>>,
+    pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
 }
 
 impl<'a> Default for UserFactory<'a> {
@@ -71,6 +77,8 @@ impl<'a> Default for UserFactory<'a> {
             name: "Bob".into(),
             age: 30,
             country: None,
+            home_city: None,
+            current_city: None,
         }
     }
 }

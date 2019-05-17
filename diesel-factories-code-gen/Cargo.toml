@@ -12,6 +12,7 @@ quote = "0.6"
 syn = "0.15.26"
 darling = "0.9.0"
 regex = "1.1.6"
+heck = "0.3.1"
 
 [lib]
 proc-macro = true

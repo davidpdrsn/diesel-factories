@@ -237,21 +237,40 @@ impl DeriveData {
     }
 
     fn association_trait(&self, field: &syn::Field) -> Option<TokenStream> {
+        use heck::CamelCase;
+
         if self.is_association_field(&field.ty) {
             let factory = self.factory_name();
-            let trait_name = ident(&format!("Set{}On{}", factory, "Country"));
-            let field_name = &field.ident;
+            let field_name = field.ident.as_ref().expect("field without name");
+            let camel_field_name = field_name.to_string().to_camel_case();
 
             let association = self.parse_association_type(&field.ty).unwrap_or_else(|| {
                 use std::fmt::Write;
                 let mut s = String::new();
-                writeln!(s, "Invalid association attribute. Must be on the form").unwrap();
+                writeln!(
+                    s,
+                    "Invalid association attribute. Must be on one of the following forms"
+                )
+                .unwrap();
+                writeln!(s).unwrap();
                 writeln!(s, "Association<'a, Model, Factory>").unwrap();
+                writeln!(s, "Option<Association<'a, Model, Factory>>").unwrap();
+                writeln!(s, "Association<'a, Model, Factory<'a>>").unwrap();
+                writeln!(s, "Option<Association<'a, Model, Factory<'a>>>").unwrap();
+                writeln!(s).unwrap();
+                writeln!(s, "Got\n{}", self.type_to_string(&field.ty)).unwrap();
                 panic!("{}", s);
             });
 
             let model = association.model;
             let other_factory = association.factory;
+
+            let other_factory_without_lifetime =
+                self.type_to_string(&other_factory).replace(" < 'a >", "");
+            let trait_name = ident(&format!(
+                "Set{}On{}For{}",
+                other_factory_without_lifetime, factory, camel_field_name
+            ));
 
             let model_impl_body = if association.is_option {
                 quote! { self.#field_name = Some(diesel_factories::Association::new_model(t)); }
@@ -278,7 +297,7 @@ impl DeriveData {
                     }
                 }
 
-                impl #trait_name<#other_factory> for #factory<'_> {
+                impl<'a> #trait_name<#other_factory> for #factory<'a> {
                     fn #field_name(mut self, t: #other_factory) -> Self {
                         #factory_impl_body
                         self
@@ -309,19 +328,29 @@ impl DeriveData {
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
         use regex::Regex;
 
-        let re = Regex::new(r"Association < 'a , (?P<model>[^ ]+) , (?P<factory>[^ ]+) >").unwrap();
+        let re = Regex::new(
+            r"(Option < )?Association < 'a , (?P<model>[^ ]+) , (?P<factory>[^ ]+( < 'a >)?) >( >)?",
+        )
+        .unwrap();
         let as_string = self.type_to_string(ty);
         let caps = re.captures(&as_string)?;
 
-        let model = ident(&caps["model"]);
-        let factory = ident(&caps["factory"]);
+        let model = &caps["model"];
+        let model = syn::parse_str::<syn::Type>(model).unwrap_or_else(|e| {
+            panic!("{}", e);
+        });
+
+        let factory = &caps["factory"];
+        let factory = syn::parse_str::<syn::Type>(factory).unwrap_or_else(|e| {
+            panic!("{}", e);
+        });
 
         let is_option = as_string.contains("Option < ");
 
         Some(Association {
             is_option,
-            model: quote! { #model },
-            factory: quote! { #factory },
+            model,
+            factory,
         })
     }
 }
@@ -332,6 +361,6 @@ fn ident(s: &str) -> syn::Ident {
 
 struct Association {
     is_option: bool,
-    model: TokenStream,
-    factory: TokenStream,
+    model: syn::Type,
+    factory: syn::Type,
 }
