@@ -272,54 +272,56 @@ impl DeriveData {
                 other_factory_without_lifetime, factory, camel_field_name
             ));
 
-            let model_impl_body = if association.is_option {
-                quote! { self.#field_name = Some(diesel_factories::Association::new_model(t)); }
+            let model_impl = if association.is_option {
+                quote! {
+                    impl<'a> #trait_name<Option<&'a #model>> for #factory<'a> {
+                        fn #field_name(mut self, t: Option<&'a #model>) -> Self {
+                            self.#field_name = t.map(|k| diesel_factories::Association::new_model(k));
+                            self
+                        }
+                    }
+                }
             } else {
-                quote! { self.#field_name = diesel_factories::Association::new_model(t); }
+                quote! {
+                    impl<'a> #trait_name<&'a #model> for #factory<'a> {
+                        fn #field_name(mut self, t: &'a #model) -> Self {
+                            self.#field_name = diesel_factories::Association::new_model(t);
+                            self
+                        }
+                    }
+                }
             };
 
-            let factory_impl_body = if association.is_option {
-                quote! { self.#field_name = Some(diesel_factories::Association::new_factory(t)); }
+            let factory_impl = if association.is_option {
+                quote! {
+                    impl<'a> #trait_name<Option<#other_factory>> for #factory<'a> {
+                        fn #field_name(mut self, t: Option<#other_factory>) -> Self {
+                            self.#field_name = t.map(|k| diesel_factories::Association::new_factory(k));
+                            self
+                        }
+                    }
+                }
             } else {
-                quote! { self.#field_name = diesel_factories::Association::new_factory(t); }
+                quote! {
+                    impl<'a> #trait_name<#other_factory> for #factory<'a> {
+                        fn #field_name(mut self, t: #other_factory) -> Self {
+                            self.#field_name = diesel_factories::Association::new_factory(t);
+                            self
+                        }
+                    }
+                }
             };
 
-            let mut out = quote! {
+            Some(quote! {
                 #[allow(missing_docs, dead_code)]
                 pub trait #trait_name<T> {
                     fn #field_name(self, t: T) -> Self;
                 }
 
-                impl<'a> #trait_name<&'a #model> for #factory<'a> {
-                    fn #field_name(mut self, t: &'a #model) -> Self {
-                        #model_impl_body
-                        self
-                    }
-                }
+                #model_impl
 
-                impl<'a> #trait_name<#other_factory> for #factory<'a> {
-                    fn #field_name(mut self, t: #other_factory) -> Self {
-                        #factory_impl_body
-                        self
-                    }
-                }
-            };
-
-            if association.is_option {
-                out.extend(quote! {
-                    impl #trait_name<Option<()>> for #factory<'_> {
-                        fn #field_name(mut self, t: Option<()>) -> Self {
-                            if t.is_some() {
-                                panic!("Got `Some(())`");
-                            }
-                            self.#field_name = None;
-                            self
-                        }
-                    }
-                });
-            }
-
-            Some(out)
+                #factory_impl
+            })
         } else {
             None
         }

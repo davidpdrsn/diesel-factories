@@ -130,7 +130,7 @@ fn overriding_country() {
     let con = setup();
 
     let bob = UserFactory::default()
-        .country(CountryFactory::default().name("USA"))
+        .country(Some(CountryFactory::default().name("USA")))
         .insert(&con);
 
     let country = find_country_by_id(bob.country_id.unwrap(), &con);
@@ -145,8 +145,8 @@ fn insert_two_users_sharing_country() {
     let con = setup();
 
     let country = CountryFactory::default().insert(&con);
-    let bob = UserFactory::default().country(&country).insert(&con);
-    let alice = UserFactory::default().country(&country).insert(&con);
+    let bob = UserFactory::default().country(Some(&country)).insert(&con);
+    let alice = UserFactory::default().country(Some(&country)).insert(&con);
 
     assert_eq!(bob.country_id, alice.country_id);
     assert_eq!(2, count_users(&con));
