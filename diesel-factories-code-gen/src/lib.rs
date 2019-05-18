@@ -67,7 +67,7 @@ impl DeriveData {
         let values = self.diesel_insert_values();
 
         self.tokens.extend(quote! {
-            impl#generics diesel_factories::FactoryMethods for #factory#generics {
+            impl#generics diesel_factories::Factory for #factory#generics {
                 type Model = #model_type;
                 type Id = #id_type;
                 type Connection = #connection_type;
