@@ -1,3 +1,5 @@
+//! See the docs for "diesel-factories" for more info about this.
+
 #![recursion_limit = "128"]
 
 extern crate proc_macro;
@@ -9,7 +11,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-/// See the docs for "diesel_factories" for more info about this.
 #[proc_macro_derive(Factory, attributes(factory))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);

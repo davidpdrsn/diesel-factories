@@ -1,8 +1,10 @@
-# Diesel factories
+# [diesel-factories](https://crates.io/crates/diesel-factories)
 
-Test factories for Diesel.
+An implementation of the test factory pattern made to work with [Diesel](https://diesel.rs).
 
-Still very much work in progress.
+See [the documentation for more info](https://docs.rs/crate/diesel-factories).
+
+## Development
 
 To install the `cargo fmt` pre-commit githook:
 
@@ -22,3 +24,7 @@ And also run migrations:
 cargo install diesel_cli --no-default-features --features postgres
 diesel migration run --database-url postgresql://localhost:5432/diesel_factories_test
 ```
+
+---
+
+License: MIT
