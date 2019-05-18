@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+
+release_code_gen() {
+  cd ./diesel-factories-code-gen/
+  cargo release --no-dev-version
+}
+
+release_lib() {
+  cd ./diesel-factories/
+  cargo release --no-dev-version
+}
+
+release_code_gen
+release_lib
