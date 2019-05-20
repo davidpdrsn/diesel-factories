@@ -332,24 +332,21 @@ impl DeriveData {
 
     fn option_detected(&self, ty: &syn::Type) -> bool {
         if let Path(syn::TypePath { qself: _, path }) = ty.clone() {
-            if let syn::Path {
+            let syn::Path {
                 leading_colon: _,
                 segments,
-            } = path
-            {
-                let path_segment = segments.last().unwrap().value().clone();
-                if path_segment.ident.to_string() == "Option" {
-                    return true;
-                // println!("Optional detected {}", self.type_to_string(ty))
-                } else {
-                    return false;
-                    // println!("Optional NOT detected {}", self.type_to_string(ty))
-                }
+            } = path;
+
+            let path_segment = segments.last().unwrap().value().clone();
+            if path_segment.ident.to_string() == "Option" {
+                return true;
+            // println!("Optional detected {}", self.type_to_string(ty))
             } else {
-                panic!("wut");
+                return false;
+                // println!("Optional NOT detected {}", self.type_to_string(ty))
             }
         } else {
-            panic!("hjer");
+            panic!("Expected a TypePath here");
         }
     }
 
