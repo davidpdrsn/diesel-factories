@@ -340,10 +340,8 @@ impl DeriveData {
             let path_segment = segments.last().unwrap().value().clone();
             if path_segment.ident.to_string() == "Option" {
                 return true;
-            // println!("Optional detected {}", self.type_to_string(ty))
             } else {
                 return false;
-                // println!("Optional NOT detected {}", self.type_to_string(ty))
             }
         } else {
             panic!("Expected a TypePath here");
