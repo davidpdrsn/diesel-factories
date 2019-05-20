@@ -9,6 +9,8 @@ use darling::FromDeriveInput;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::PathSegment;
+use syn::Type::Path;
 use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Factory, attributes(factory))]
@@ -328,7 +330,33 @@ impl DeriveData {
         }
     }
 
+    fn option_detected(&self, ty: &syn::Type) -> bool {
+        if let Path(syn::TypePath { qself: _, path }) = ty.clone() {
+            if let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path
+            {
+                let path_segment = segments.last().unwrap().value().clone();
+                if path_segment.ident.to_string() == "Option" {
+                    return true;
+                // println!("Optional detected {}", self.type_to_string(ty))
+                } else {
+                    return false;
+                    // println!("Optional NOT detected {}", self.type_to_string(ty))
+                }
+            } else {
+                panic!("wut");
+            }
+        } else {
+            panic!("hjer");
+        }
+    }
+
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
+        println!("START PARSE");
+        let is_option = self.option_detected(ty);
+
         use regex::Regex;
 
         let re = Regex::new(
@@ -347,8 +375,6 @@ impl DeriveData {
         let factory = syn::parse_str::<syn::Type>(factory).unwrap_or_else(|e| {
             panic!("{}", e);
         });
-
-        let is_option = as_string.contains("Option < ");
 
         Some(Association {
             is_option,
