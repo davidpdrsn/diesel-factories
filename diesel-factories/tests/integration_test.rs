@@ -67,7 +67,7 @@ struct UserFactory<'a> {
     pub name: String,
     pub age: i32,
     pub country: std::option::Option<diesel_factories::Association<'a, Country, CountryFactory>>,
-    pub home_city: Option<Association<'a, City, CityFactory<'a>>>,
+    pub home_city: Option<diesel_factories::Association<'a, City, CityFactory<'a>>>,
     pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
 }
 

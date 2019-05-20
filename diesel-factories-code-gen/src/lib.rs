@@ -189,9 +189,53 @@ impl DeriveData {
         }
     }
 
+    fn extract_outermost_type<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
+        if let Path(syn::TypePath { qself: _, path }) = ty {
+            let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path;
+
+            &segments.last().unwrap().value()
+        } else {
+            panic!("Expected a TypePath here");
+        }
+    }
+
+    fn option_detected(&self, ty: &syn::Type) -> bool {
+        if self.extract_outermost_type(ty).ident.to_string() == "Option" {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     fn is_association_field(&self, ty: &syn::Type) -> bool {
         let as_string = self.type_to_string(ty);
-        as_string.contains("Association <")
+
+        let ident;
+        if (!self.option_detected(ty)) {
+            ident = self.extract_outermost_type(ty).ident.clone();
+        } else {
+            if let syn::PathArguments::AngleBracketed(item) =
+                &self.extract_outermost_type(ty).arguments
+            {
+                if let syn::GenericArgument::Type(unwrapped_type) =
+                    &item.args.last().unwrap().value().clone()
+                {
+                    ident = self.extract_outermost_type(unwrapped_type).ident.clone();
+                } else {
+                    panic!("ack")
+                }
+            } else {
+                panic!("weird args")
+            }
+        }
+        if ident.to_string() == "Association" {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     fn type_to_string(&self, ty: &syn::Type) -> String {
@@ -327,24 +371,6 @@ impl DeriveData {
             })
         } else {
             None
-        }
-    }
-
-    fn option_detected(&self, ty: &syn::Type) -> bool {
-        if let Path(syn::TypePath { qself: _, path }) = ty.clone() {
-            let syn::Path {
-                leading_colon: _,
-                segments,
-            } = path;
-
-            let path_segment = segments.last().unwrap().value().clone();
-            if path_segment.ident.to_string() == "Option" {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            panic!("Expected a TypePath here");
         }
     }
 
