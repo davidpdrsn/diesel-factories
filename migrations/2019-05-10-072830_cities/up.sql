@@ -1,7 +1,9 @@
 CREATE TABLE cities (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  country_id integer NOT NULL
+  country_id integer NOT NULL,
+  team_association TEXT NULL,
+  association_label TEXT NULL
 );
 
 ALTER TABLE users

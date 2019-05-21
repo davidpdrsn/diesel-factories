@@ -29,6 +29,8 @@ mod schema {
         cities (id) {
             id -> Integer,
             name -> Text,
+            team_association -> Text,
+            association_label -> Text,
             country_id -> Integer,
         }
     }
@@ -54,6 +56,8 @@ struct Country {
 struct City {
     pub id: i32,
     pub name: String,
+    pub team_association: String,
+    pub association_label: String,
     pub country_id: i32,
 }
 
@@ -101,6 +105,8 @@ impl Default for CountryFactory {
 #[factory(model = "City", table = "crate::schema::cities")]
 struct CityFactory<'b> {
     pub name: String,
+    pub team_association: String,
+    pub association_label: String,
     pub country: Association<'b, Country, CountryFactory>,
 }
 
@@ -108,6 +114,8 @@ impl<'b> Default for CityFactory<'b> {
     fn default() -> Self {
         Self {
             name: "Copenhagen".into(),
+            team_association: "teamfive".into(),
+            association_label: "thebest".into(),
             country: Association::default(),
         }
     }
