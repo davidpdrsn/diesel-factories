@@ -42,6 +42,19 @@ struct DeriveData {
     tokens: TokenStream,
 }
 
+trait ToString {
+    fn to_string(&self) -> String;
+}
+
+impl ToString for syn::Type {
+    fn to_string(&self) -> String {
+        use quote::ToTokens;
+        let mut tokenized = quote! {};
+        self.to_tokens(&mut tokenized);
+        tokenized.to_string()
+    }
+}
+
 impl DeriveData {
     fn new(input: DeriveInput, options: Options) -> Self {
         Self {
@@ -188,15 +201,6 @@ impl DeriveData {
         }
     }
 
-    // TODO implement on syn::Type
-    fn type_to_string(&self, ty: &syn::Type) -> String {
-        use quote::ToTokens;
-
-        let mut tokenized = quote! {};
-        ty.to_tokens(&mut tokenized);
-        tokenized.to_string()
-    }
-
     fn builder_methods(&self) -> Vec<TokenStream> {
         self.struct_fields()
             .filter_map(|field| self.builder_method(field))
@@ -256,7 +260,7 @@ impl DeriveData {
                 writeln!(s, "Association<'a, Model, Factory<'a>>").unwrap();
                 writeln!(s, "Option<Association<'a, Model, Factory<'a>>>").unwrap();
                 writeln!(s).unwrap();
-                writeln!(s, "Got\n{}", self.type_to_string(&field.ty)).unwrap();
+                writeln!(s, "Got\n{}", &field.ty.to_string()).unwrap();
                 panic!("{}", s);
             });
 
@@ -386,8 +390,8 @@ impl DeriveData {
                 .collect::<Vec<syn::Type>>();
             if types_we_care_about.len() != 2 {
                 dbg!(item);
-                dbg!(self.type_to_string(ty));
-                dbg!(self.type_to_string(types_we_care_about.first().unwrap()));
+                dbg!(ty.to_string());
+                dbg!(types_we_care_about.first().unwrap().to_string());
                 panic!("should only have model and factory");
             }
             let model_type = types_we_care_about.first().unwrap();
