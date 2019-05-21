@@ -9,7 +9,6 @@ use darling::FromDeriveInput;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::PathSegment;
 use syn::Type::Path;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -189,55 +188,7 @@ impl DeriveData {
         }
     }
 
-    fn extract_outermost_type<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
-        if let Path(syn::TypePath { qself: _, path }) = ty {
-            let syn::Path {
-                leading_colon: _,
-                segments,
-            } = path;
-
-            &segments.last().unwrap().value()
-        } else {
-            panic!("Expected a TypePath here");
-        }
-    }
-
-    fn option_detected(&self, ty: &syn::Type) -> bool {
-        if self.extract_outermost_type(ty).ident.to_string() == "Option" {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    fn is_association_field(&self, ty: &syn::Type) -> bool {
-        let as_string = self.type_to_string(ty);
-
-        let ident;
-        if (!self.option_detected(ty)) {
-            ident = self.extract_outermost_type(ty).ident.clone();
-        } else {
-            if let syn::PathArguments::AngleBracketed(item) =
-                &self.extract_outermost_type(ty).arguments
-            {
-                if let syn::GenericArgument::Type(unwrapped_type) =
-                    &item.args.last().unwrap().value().clone()
-                {
-                    ident = self.extract_outermost_type(unwrapped_type).ident.clone();
-                } else {
-                    panic!("ack")
-                }
-            } else {
-                panic!("weird args")
-            }
-        }
-        if ident.to_string() == "Association" {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
+    // TODO implement on syn::Type
     fn type_to_string(&self, ty: &syn::Type) -> String {
         use quote::ToTokens;
 
@@ -312,8 +263,7 @@ impl DeriveData {
             let model = association.model;
             let other_factory = association.factory;
 
-            let other_factory_without_lifetime =
-                self.type_to_string(&other_factory).replace(" < 'a >", "");
+            let other_factory_without_lifetime = other_factory.to_string().replace(" < 'a >", "");
             let trait_name = ident(&format!(
                 "Set{}On{}For{}",
                 other_factory_without_lifetime, factory, camel_field_name
@@ -374,34 +324,98 @@ impl DeriveData {
         }
     }
 
+    fn extract_outermost_type<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
+        if let Path(syn::TypePath { qself: _, path }) = ty {
+            let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path;
+
+            &segments.last().unwrap().value()
+        } else {
+            panic!("Expected a TypePath here");
+        }
+    }
+
+    fn extract_outermost_non_optional<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
+        if !self.option_detected(ty) {
+            return self.extract_outermost_type(ty);
+        } else {
+            if let syn::PathArguments::AngleBracketed(item) =
+                &self.extract_outermost_type(ty).arguments
+            {
+                if let syn::GenericArgument::Type(unwrapped_type) =
+                    &item.args.last().unwrap().value().clone()
+                {
+                    return self.extract_outermost_type(unwrapped_type);
+                } else {
+                    panic!("ack")
+                }
+            } else {
+                panic!("weird args")
+            }
+        }
+    }
+
+    fn option_detected(&self, ty: &syn::Type) -> bool {
+        self.extract_outermost_type(ty).ident.to_string() == "Option"
+    }
+
+    fn is_association_field(&self, ty: &syn::Type) -> bool {
+        self.extract_outermost_non_optional(ty).ident.to_string() == "Association"
+    }
+
+    fn extract_model_and_factory(&self, ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
+        use quote::ToTokens;
+
+        let path_segment = self.extract_outermost_non_optional(ty);
+        let syn::PathSegment { ident, arguments } = path_segment;
+
+        if let syn::PathArguments::AngleBracketed(item) = arguments {
+            let types_we_care_about = item
+                .clone()
+                .args
+                .into_iter()
+                .filter_map(|token| {
+                    if let syn::GenericArgument::Type(extracted) = token {
+                        return Some(extracted);
+                    } else {
+                        return None;
+                    }
+                })
+                .collect::<Vec<syn::Type>>();
+            if types_we_care_about.len() != 2 {
+                dbg!(item);
+                dbg!(self.type_to_string(ty));
+                dbg!(self.type_to_string(types_we_care_about.first().unwrap()));
+                panic!("should only have model and factory");
+            }
+            let model_type = types_we_care_about.first().unwrap();
+            let model = self.extract_outermost_type(&model_type);
+            let factory_type = types_we_care_about.last().unwrap();
+            let factory = self.extract_outermost_type(&factory_type);
+
+            return Some((model.into_token_stream(), factory.into_token_stream()));
+        } else {
+            None
+        }
+    }
+
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
-        println!("START PARSE");
         let is_option = self.option_detected(ty);
 
-        use regex::Regex;
+        if let Some((model, factory)) = self.extract_model_and_factory(ty) {
+            // let model = syn::parse_str::<syn::Type>(&model).unwrap();
+            // let factory = syn::parse_str::<syn::Type>(&factory).unwrap();
 
-        let re = Regex::new(
-            r"(Option < )?Association < 'a , (?P<model>[^ ]+) , (?P<factory>[^ ]+( < 'a >)?) >( >)?",
-        )
-        .unwrap();
-        let as_string = self.type_to_string(ty);
-        let caps = re.captures(&as_string)?;
-
-        let model = &caps["model"];
-        let model = syn::parse_str::<syn::Type>(model).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-
-        let factory = &caps["factory"];
-        let factory = syn::parse_str::<syn::Type>(factory).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-
-        Some(Association {
-            is_option,
-            model,
-            factory,
-        })
+            Some(Association {
+                is_option,
+                model,
+                factory,
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -411,6 +425,6 @@ fn ident(s: &str) -> syn::Ident {
 
 struct Association {
     is_option: bool,
-    model: syn::Type,
-    factory: syn::Type,
+    model: proc_macro2::TokenStream,
+    factory: proc_macro2::TokenStream,
 }
