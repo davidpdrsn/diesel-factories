@@ -48,6 +48,7 @@ trait Monkey {
     fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment;
     fn option_detected(&self) -> bool;
     fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment;
+    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
 }
 
 impl Monkey for syn::Type {
@@ -92,6 +93,57 @@ impl Monkey for syn::Type {
             } else {
                 panic!("weird args")
             }
+        }
+    }
+
+    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
+        let path_segment = self.extract_outermost_non_optional();
+        let syn::PathSegment { ident, arguments } = path_segment;
+
+        if let syn::PathArguments::AngleBracketed(item) = arguments {
+            let types_we_care_about = item
+                .clone()
+                .args
+                .into_iter()
+                .filter_map(|token| {
+                    if let syn::GenericArgument::Type(extracted) = token {
+                        return Some(extracted);
+                    } else {
+                        return None;
+                    }
+                })
+                .collect::<Vec<syn::Type>>();
+            if types_we_care_about.len() != 2 {
+                dbg!(item);
+                dbg!(self.to_string());
+                dbg!(types_we_care_about.first().unwrap().to_string());
+                panic!("should only have model and factory");
+            }
+            let model_type = types_we_care_about.first().unwrap();
+            let model = model_type.extract_outermost_type();
+            let factory_type = types_we_care_about.last().unwrap();
+            let factory = factory_type.extract_outermost_type();
+            let model_tokens;
+            let factory_tokens;
+            if let syn::PathArguments::AngleBracketed(args) = &model.arguments {
+                let ident = &model.ident;
+                model_tokens = quote! {
+                    #ident<'z>
+                };
+            } else {
+                model_tokens = model.into_token_stream();
+            }
+            if let syn::PathArguments::AngleBracketed(args) = &factory.arguments {
+                let ident = &factory.ident;
+                factory_tokens = quote! {
+                    #ident<'z>
+                };
+            } else {
+                factory_tokens = factory.into_token_stream();
+            }
+            return Some((model_tokens, factory_tokens));
+        } else {
+            None
         }
     }
 }
@@ -373,61 +425,10 @@ impl DeriveData {
         ty.extract_outermost_non_optional().ident.to_string() == "Association"
     }
 
-    fn extract_model_and_factory(&self, ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
-        let path_segment = ty.extract_outermost_non_optional();
-        let syn::PathSegment { ident, arguments } = path_segment;
-
-        if let syn::PathArguments::AngleBracketed(item) = arguments {
-            let types_we_care_about = item
-                .clone()
-                .args
-                .into_iter()
-                .filter_map(|token| {
-                    if let syn::GenericArgument::Type(extracted) = token {
-                        return Some(extracted);
-                    } else {
-                        return None;
-                    }
-                })
-                .collect::<Vec<syn::Type>>();
-            if types_we_care_about.len() != 2 {
-                dbg!(item);
-                dbg!(ty.to_string());
-                dbg!(types_we_care_about.first().unwrap().to_string());
-                panic!("should only have model and factory");
-            }
-            let model_type = types_we_care_about.first().unwrap();
-            let model = model_type.extract_outermost_type();
-            let factory_type = types_we_care_about.last().unwrap();
-            let factory = factory_type.extract_outermost_type();
-            let model_tokens;
-            let factory_tokens;
-            if let syn::PathArguments::AngleBracketed(args) = &model.arguments {
-                let ident = &model.ident;
-                model_tokens = quote! {
-                    #ident<'z>
-                };
-            } else {
-                model_tokens = model.into_token_stream();
-            }
-            if let syn::PathArguments::AngleBracketed(args) = &factory.arguments {
-                let ident = &factory.ident;
-                factory_tokens = quote! {
-                    #ident<'z>
-                };
-            } else {
-                factory_tokens = factory.into_token_stream();
-            }
-            return Some((model_tokens, factory_tokens));
-        } else {
-            None
-        }
-    }
-
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
         let is_option = ty.option_detected();
 
-        if let Some((model, factory)) = self.extract_model_and_factory(ty) {
+        if let Some((model, factory)) = ty.extract_model_and_factory() {
             Some(Association {
                 is_option,
                 model,
