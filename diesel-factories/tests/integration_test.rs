@@ -63,15 +63,15 @@ struct City {
     table = "crate::schema::users",
     connection = "diesel::pg::PgConnection"
 )]
-struct UserFactory<'a> {
+struct UserFactory<'b> {
     pub name: String,
     pub age: i32,
-    pub country: std::option::Option<diesel_factories::Association<'a, Country, CountryFactory>>,
-    pub home_city: Option<diesel_factories::Association<'a, City, CityFactory<'a>>>,
-    pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
+    pub country: std::option::Option<diesel_factories::Association<'b, Country, CountryFactory>>,
+    pub home_city: Option<diesel_factories::Association<'b, City, CityFactory<'b>>>,
+    pub current_city: Option<Association<'b, City, CityFactory<'b>>>,
 }
 
-impl<'a> Default for UserFactory<'a> {
+impl<'b> Default for UserFactory<'b> {
     fn default() -> Self {
         Self {
             name: "Bob".into(),
@@ -99,12 +99,12 @@ impl Default for CountryFactory {
 
 #[derive(Clone, Factory)]
 #[factory(model = "City", table = "crate::schema::cities")]
-struct CityFactory<'a> {
+struct CityFactory<'b> {
     pub name: String,
-    pub country: Association<'a, Country, CountryFactory>,
+    pub country: Association<'b, Country, CountryFactory>,
 }
 
-impl<'a> Default for CityFactory<'a> {
+impl<'b> Default for CityFactory<'b> {
     fn default() -> Self {
         Self {
             name: "Copenhagen".into(),

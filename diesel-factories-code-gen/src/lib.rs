@@ -262,8 +262,8 @@ impl DeriveData {
 
             let model = association.model;
             let other_factory = association.factory;
-
-            let other_factory_without_lifetime = other_factory.to_string().replace(" < 'a >", "");
+            let temp = other_factory.to_string();
+            let other_factory_without_lifetime = temp.split(" <").next().unwrap();
             let trait_name = ident(&format!(
                 "Set{}On{}For{}",
                 other_factory_without_lifetime, factory, camel_field_name
