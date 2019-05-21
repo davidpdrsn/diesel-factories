@@ -50,9 +50,24 @@ trait Monkey {
     fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment;
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
     fn is_association_field(&self) -> bool;
+    fn parse_association_type(&self) -> Option<Association>;
 }
 
 impl Monkey for syn::Type {
+    fn parse_association_type(&self) -> Option<Association> {
+        let is_option = self.option_detected();
+
+        if let Some((model, factory)) = self.extract_model_and_factory() {
+            Some(Association {
+                is_option,
+                model,
+                factory,
+            })
+        } else {
+            None
+        }
+    }
+
     fn is_association_field(&self) -> bool {
         self.extract_outermost_non_optional().ident.to_string() == "Association"
     }
@@ -276,7 +291,7 @@ impl DeriveData {
             .as_ref()
             .unwrap_or_else(|| panic!("Factory can only be derived for named fields"));
 
-        if let Some(association) = self.parse_association_type(&field.ty) {
+        if let Some(association) = field.ty.parse_association_type() {
             let foreign_key_field = ident(&format!("{}_id", name));
             if association.is_option {
                 quote! {
@@ -344,7 +359,7 @@ impl DeriveData {
             let field_name = field.ident.as_ref().expect("field without name");
             let camel_field_name = field_name.to_string().to_camel_case();
 
-            let association = self.parse_association_type(&field.ty).unwrap_or_else(|| {
+            let association = field.ty.parse_association_type().unwrap_or_else(|| {
                 use std::fmt::Write;
                 let mut s = String::new();
                 writeln!(
@@ -420,20 +435,6 @@ impl DeriveData {
                 #model_impl
 
                 #factory_impl
-            })
-        } else {
-            None
-        }
-    }
-
-    fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
-        let is_option = ty.option_detected();
-
-        if let Some((model, factory)) = ty.extract_model_and_factory() {
-            Some(Association {
-                is_option,
-                model,
-                factory,
             })
         } else {
             None
