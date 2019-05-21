@@ -125,9 +125,8 @@ impl Monkey for syn::Type {
 
         if let syn::PathArguments::AngleBracketed(item) = arguments {
             let types_we_care_about = item
-                .clone()
                 .args
-                .into_iter()
+                .iter()
                 .filter_map(|token| {
                     if let syn::GenericArgument::Type(extracted) = token {
                         return Some(extracted);
@@ -135,7 +134,7 @@ impl Monkey for syn::Type {
                         return None;
                     }
                 })
-                .collect::<Vec<syn::Type>>();
+                .collect::<Vec<&syn::Type>>();
             if types_we_care_about.len() != 2 {
                 panic!("should only have model and factory");
             }
