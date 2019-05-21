@@ -47,6 +47,7 @@ trait Monkey {
     fn to_string(&self) -> String;
     fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment;
     fn option_detected(&self) -> bool;
+    fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment;
 }
 
 impl Monkey for syn::Type {
@@ -72,6 +73,26 @@ impl Monkey for syn::Type {
 
     fn option_detected(&self) -> bool {
         self.extract_outermost_type().ident.to_string() == "Option"
+    }
+
+    fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment {
+        if !self.option_detected() {
+            return self.extract_outermost_type();
+        } else {
+            if let syn::PathArguments::AngleBracketed(item) =
+                &self.extract_outermost_type().arguments
+            {
+                if let syn::GenericArgument::Type(unwrapped_type) =
+                    &item.args.last().unwrap().value().clone()
+                {
+                    return &unwrapped_type.extract_outermost_type();
+                } else {
+                    panic!("ack")
+                }
+            } else {
+                panic!("weird args")
+            }
+        }
     }
 }
 
@@ -348,31 +369,12 @@ impl DeriveData {
         }
     }
 
-    fn extract_outermost_non_optional<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
-        if !ty.option_detected() {
-            return ty.extract_outermost_type();
-        } else {
-            if let syn::PathArguments::AngleBracketed(item) = &ty.extract_outermost_type().arguments
-            {
-                if let syn::GenericArgument::Type(unwrapped_type) =
-                    &item.args.last().unwrap().value().clone()
-                {
-                    return &unwrapped_type.extract_outermost_type();
-                } else {
-                    panic!("ack")
-                }
-            } else {
-                panic!("weird args")
-            }
-        }
-    }
-
     fn is_association_field(&self, ty: &syn::Type) -> bool {
-        self.extract_outermost_non_optional(ty).ident.to_string() == "Association"
+        ty.extract_outermost_non_optional().ident.to_string() == "Association"
     }
 
     fn extract_model_and_factory(&self, ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
-        let path_segment = self.extract_outermost_non_optional(ty);
+        let path_segment = ty.extract_outermost_non_optional();
         let syn::PathSegment { ident, arguments } = path_segment;
 
         if let syn::PathArguments::AngleBracketed(item) = arguments {
