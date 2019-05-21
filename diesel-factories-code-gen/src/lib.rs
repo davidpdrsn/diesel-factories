@@ -271,8 +271,8 @@ impl DeriveData {
 
             let model_impl = if association.is_option {
                 quote! {
-                    impl<'a> #trait_name<Option<&'a #model>> for #factory<'a> {
-                        fn #field_name(mut self, t: Option<&'a #model>) -> Self {
+                    impl<'z> #trait_name<Option<&'z #model>> for #factory<'z> {
+                        fn #field_name(mut self, t: Option<&'z #model>) -> Self {
                             self.#field_name = t.map(|k| diesel_factories::Association::new_model(k));
                             self
                         }
@@ -280,8 +280,8 @@ impl DeriveData {
                 }
             } else {
                 quote! {
-                    impl<'a> #trait_name<&'a #model> for #factory<'a> {
-                        fn #field_name(mut self, t: &'a #model) -> Self {
+                    impl<'z> #trait_name<&'z #model> for #factory<'z> {
+                        fn #field_name(mut self, t: &'z #model) -> Self {
                             self.#field_name = diesel_factories::Association::new_model(t);
                             self
                         }
@@ -291,7 +291,7 @@ impl DeriveData {
 
             let factory_impl = if association.is_option {
                 quote! {
-                    impl<'a> #trait_name<Option<#other_factory>> for #factory<'a> {
+                    impl<'z> #trait_name<Option<#other_factory>> for #factory<'z> {
                         fn #field_name(mut self, t: Option<#other_factory>) -> Self {
                             self.#field_name = t.map(|k| diesel_factories::Association::new_factory(k));
                             self
@@ -300,7 +300,7 @@ impl DeriveData {
                 }
             } else {
                 quote! {
-                    impl<'a> #trait_name<#other_factory> for #factory<'a> {
+                    impl<'z> #trait_name<#other_factory> for #factory<'z> {
                         fn #field_name(mut self, t: #other_factory) -> Self {
                             self.#field_name = diesel_factories::Association::new_factory(t);
                             self
@@ -394,8 +394,25 @@ impl DeriveData {
             let model = self.extract_outermost_type(&model_type);
             let factory_type = types_we_care_about.last().unwrap();
             let factory = self.extract_outermost_type(&factory_type);
-
-            return Some((model.into_token_stream(), factory.into_token_stream()));
+            let model_tokens;
+            let factory_tokens;
+            if let syn::PathArguments::AngleBracketed(args) = &model.arguments {
+                let ident = &model.ident;
+                model_tokens = quote! {
+                    #ident<'z>
+                };
+            } else {
+                model_tokens = model.into_token_stream();
+            }
+            if let syn::PathArguments::AngleBracketed(args) = &factory.arguments {
+                let ident = &factory.ident;
+                factory_tokens = quote! {
+                    #ident<'z>
+                };
+            } else {
+                factory_tokens = factory.into_token_stream();
+            }
+            return Some((model_tokens, factory_tokens));
         } else {
             None
         }
@@ -405,9 +422,6 @@ impl DeriveData {
         let is_option = self.option_detected(ty);
 
         if let Some((model, factory)) = self.extract_model_and_factory(ty) {
-            // let model = syn::parse_str::<syn::Type>(&model).unwrap();
-            // let factory = syn::parse_str::<syn::Type>(&factory).unwrap();
-
             Some(Association {
                 is_option,
                 model,
