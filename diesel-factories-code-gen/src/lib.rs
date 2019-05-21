@@ -10,7 +10,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
-use syn::Type::Path;
 use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_derive(Factory, attributes(factory))]
@@ -100,7 +99,7 @@ impl MonkeyType for syn::Type {
     }
 
     fn extract_outermost_type(&self) -> &syn::PathSegment {
-        if let Path(syn::TypePath { qself: _, path }) = self {
+        if let syn::Type::Path(syn::TypePath { qself: _, path }) = self {
             let syn::Path {
                 leading_colon: _,
                 segments,
@@ -161,9 +160,10 @@ impl MonkeyType for syn::Type {
             }
             let model_type = types_we_care_about.first().unwrap();
             let model = model_type.extract_outermost_type();
+            let model_tokens = model.normalize_lifetime_names();
+
             let factory_type = types_we_care_about.last().unwrap();
             let factory = factory_type.extract_outermost_type();
-            let model_tokens = model.normalize_lifetime_names();
             let factory_tokens = factory.normalize_lifetime_names();
             return Some((model_tokens, factory_tokens));
         } else {
@@ -268,15 +268,15 @@ impl DeriveData {
     }
 
     fn struct_fields(&self) -> syn::punctuated::Iter<syn::Field> {
-        use syn::{Data, Fields};
-
         match &self.input.data {
-            Data::Union(_) => panic!("Factory can only be derived on structs"),
-            Data::Enum(_) => panic!("Factory can only be derived on structs"),
-            Data::Struct(data) => match &data.fields {
-                Fields::Named(named) => named.named.iter(),
-                Fields::Unit => panic!("Factory can only be derived on structs with named fields"),
-                Fields::Unnamed(_) => {
+            syn::Data::Union(_) => panic!("Factory can only be derived on structs"),
+            syn::Data::Enum(_) => panic!("Factory can only be derived on structs"),
+            syn::Data::Struct(data) => match &data.fields {
+                syn::Fields::Named(named) => named.named.iter(),
+                syn::Fields::Unit => {
+                    panic!("Factory can only be derived on structs with named fields")
+                }
+                syn::Fields::Unnamed(_) => {
                     panic!("Factory can only be derived on structs with named fields")
                 }
             },
