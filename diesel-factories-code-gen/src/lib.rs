@@ -49,9 +49,14 @@ trait Monkey {
     fn option_detected(&self) -> bool;
     fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment;
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
+    fn is_association_field(&self) -> bool;
 }
 
 impl Monkey for syn::Type {
+    fn is_association_field(&self) -> bool {
+        self.extract_outermost_non_optional().ident.to_string() == "Association"
+    }
+
     fn to_string(&self) -> String {
         use quote::ToTokens;
         let mut tokenized = quote! {};
@@ -304,7 +309,7 @@ impl DeriveData {
         let name = &field.ident;
         let ty = &field.ty;
 
-        if self.is_association_field(&field.ty) {
+        if field.ty.is_association_field() {
             None
         } else {
             Some(quote! {
@@ -334,7 +339,7 @@ impl DeriveData {
     fn association_trait(&self, field: &syn::Field) -> Option<TokenStream> {
         use heck::CamelCase;
 
-        if self.is_association_field(&field.ty) {
+        if field.ty.is_association_field() {
             let factory = self.factory_name();
             let field_name = field.ident.as_ref().expect("field without name");
             let camel_field_name = field_name.to_string().to_camel_case();
@@ -419,10 +424,6 @@ impl DeriveData {
         } else {
             None
         }
-    }
-
-    fn is_association_field(&self, ty: &syn::Type) -> bool {
-        ty.extract_outermost_non_optional().ident.to_string() == "Association"
     }
 
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
