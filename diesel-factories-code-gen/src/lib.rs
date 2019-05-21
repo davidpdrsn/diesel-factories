@@ -118,7 +118,10 @@ impl Monkey for syn::Type {
 
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
         let path_segment = self.extract_outermost_non_optional();
-        let syn::PathSegment { ident, arguments } = path_segment;
+        let syn::PathSegment {
+            ident: _,
+            arguments,
+        } = path_segment;
 
         if let syn::PathArguments::AngleBracketed(item) = arguments {
             let types_we_care_about = item
@@ -145,7 +148,7 @@ impl Monkey for syn::Type {
             let factory = factory_type.extract_outermost_type();
             let model_tokens;
             let factory_tokens;
-            if let syn::PathArguments::AngleBracketed(args) = &model.arguments {
+            if let syn::PathArguments::AngleBracketed(_args) = &model.arguments {
                 let ident = &model.ident;
                 model_tokens = quote! {
                     #ident<'z>
@@ -153,7 +156,7 @@ impl Monkey for syn::Type {
             } else {
                 model_tokens = model.into_token_stream();
             }
-            if let syn::PathArguments::AngleBracketed(args) = &factory.arguments {
+            if let syn::PathArguments::AngleBracketed(_args) = &factory.arguments {
                 let ident = &factory.ident;
                 factory_tokens = quote! {
                     #ident<'z>
