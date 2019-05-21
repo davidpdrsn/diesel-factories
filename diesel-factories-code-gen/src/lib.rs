@@ -45,9 +45,9 @@ struct DeriveData {
 
 trait Monkey {
     fn to_string(&self) -> String;
-    fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment;
+    fn extract_outermost_type(&self) -> &syn::PathSegment;
     fn option_detected(&self) -> bool;
-    fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment;
+    fn extract_outermost_non_optional(&self) -> &syn::PathSegment;
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
     fn is_association_field(&self) -> bool;
     fn parse_association_type(&self) -> Option<Association>;
@@ -79,7 +79,7 @@ impl Monkey for syn::Type {
         tokenized.to_string()
     }
 
-    fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment {
+    fn extract_outermost_type(&self) -> &syn::PathSegment {
         if let Path(syn::TypePath { qself: _, path }) = self {
             let syn::Path {
                 leading_colon: _,
@@ -96,7 +96,7 @@ impl Monkey for syn::Type {
         self.extract_outermost_type().ident.to_string() == "Option"
     }
 
-    fn extract_outermost_non_optional<'a>(&'a self) -> &'a syn::PathSegment {
+    fn extract_outermost_non_optional(&self) -> &syn::PathSegment {
         if !self.option_detected() {
             return self.extract_outermost_type();
         } else {
