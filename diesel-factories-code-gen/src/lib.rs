@@ -9,6 +9,7 @@ use darling::FromDeriveInput;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use quote::ToTokens;
 use syn::Type::Path;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -42,16 +43,30 @@ struct DeriveData {
     tokens: TokenStream,
 }
 
-trait ToString {
+trait Monkey {
     fn to_string(&self) -> String;
+    fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment;
 }
 
-impl ToString for syn::Type {
+impl Monkey for syn::Type {
     fn to_string(&self) -> String {
         use quote::ToTokens;
         let mut tokenized = quote! {};
         self.to_tokens(&mut tokenized);
         tokenized.to_string()
+    }
+
+    fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment {
+        if let Path(syn::TypePath { qself: _, path }) = self {
+            let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path;
+
+            &segments.last().unwrap().value()
+        } else {
+            panic!("Expected a TypePath here");
+        }
     }
 }
 
@@ -328,30 +343,16 @@ impl DeriveData {
         }
     }
 
-    fn extract_outermost_type<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
-        if let Path(syn::TypePath { qself: _, path }) = ty {
-            let syn::Path {
-                leading_colon: _,
-                segments,
-            } = path;
-
-            &segments.last().unwrap().value()
-        } else {
-            panic!("Expected a TypePath here");
-        }
-    }
-
     fn extract_outermost_non_optional<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
         if !self.option_detected(ty) {
-            return self.extract_outermost_type(ty);
+            return ty.extract_outermost_type();
         } else {
-            if let syn::PathArguments::AngleBracketed(item) =
-                &self.extract_outermost_type(ty).arguments
+            if let syn::PathArguments::AngleBracketed(item) = &ty.extract_outermost_type().arguments
             {
                 if let syn::GenericArgument::Type(unwrapped_type) =
                     &item.args.last().unwrap().value().clone()
                 {
-                    return self.extract_outermost_type(unwrapped_type);
+                    return &unwrapped_type.extract_outermost_type();
                 } else {
                     panic!("ack")
                 }
@@ -362,7 +363,7 @@ impl DeriveData {
     }
 
     fn option_detected(&self, ty: &syn::Type) -> bool {
-        self.extract_outermost_type(ty).ident.to_string() == "Option"
+        &ty.extract_outermost_type().ident.to_string() == "Option"
     }
 
     fn is_association_field(&self, ty: &syn::Type) -> bool {
@@ -370,8 +371,6 @@ impl DeriveData {
     }
 
     fn extract_model_and_factory(&self, ty: &syn::Type) -> Option<(TokenStream, TokenStream)> {
-        use quote::ToTokens;
-
         let path_segment = self.extract_outermost_non_optional(ty);
         let syn::PathSegment { ident, arguments } = path_segment;
 
@@ -395,9 +394,9 @@ impl DeriveData {
                 panic!("should only have model and factory");
             }
             let model_type = types_we_care_about.first().unwrap();
-            let model = self.extract_outermost_type(&model_type);
+            let model = model_type.extract_outermost_type();
             let factory_type = types_we_care_about.last().unwrap();
-            let factory = self.extract_outermost_type(&factory_type);
+            let factory = factory_type.extract_outermost_type();
             let model_tokens;
             let factory_tokens;
             if let syn::PathArguments::AngleBracketed(args) = &model.arguments {
