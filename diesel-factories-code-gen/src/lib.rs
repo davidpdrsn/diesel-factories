@@ -104,7 +104,7 @@ impl Monkey for syn::Type {
                 &self.extract_outermost_type().arguments
             {
                 if let syn::GenericArgument::Type(unwrapped_type) =
-                    &item.args.last().unwrap().value().clone()
+                    &item.args.last().unwrap().value()
                 {
                     return &unwrapped_type.extract_outermost_type();
                 } else {
@@ -137,9 +137,6 @@ impl Monkey for syn::Type {
                 })
                 .collect::<Vec<syn::Type>>();
             if types_we_care_about.len() != 2 {
-                dbg!(item);
-                dbg!(self.to_string());
-                dbg!(types_we_care_about.first().unwrap().to_string());
                 panic!("should only have model and factory");
             }
             let model_type = types_we_care_about.first().unwrap();
@@ -148,6 +145,7 @@ impl Monkey for syn::Type {
             let factory = factory_type.extract_outermost_type();
             let model_tokens;
             let factory_tokens;
+            // FIXME dedupe this code
             if let syn::PathArguments::AngleBracketed(_args) = &model.arguments {
                 let ident = &model.ident;
                 model_tokens = quote! {
@@ -156,6 +154,7 @@ impl Monkey for syn::Type {
             } else {
                 model_tokens = model.into_token_stream();
             }
+            // FIXME dedupe this code
             if let syn::PathArguments::AngleBracketed(_args) = &factory.arguments {
                 let ident = &factory.ident;
                 factory_tokens = quote! {
