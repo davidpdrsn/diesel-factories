@@ -46,6 +46,7 @@ struct DeriveData {
 trait Monkey {
     fn to_string(&self) -> String;
     fn extract_outermost_type<'a>(&'a self) -> &'a syn::PathSegment;
+    fn option_detected(&self) -> bool;
 }
 
 impl Monkey for syn::Type {
@@ -67,6 +68,10 @@ impl Monkey for syn::Type {
         } else {
             panic!("Expected a TypePath here");
         }
+    }
+
+    fn option_detected(&self) -> bool {
+        self.extract_outermost_type().ident.to_string() == "Option"
     }
 }
 
@@ -344,7 +349,7 @@ impl DeriveData {
     }
 
     fn extract_outermost_non_optional<'a>(&self, ty: &'a syn::Type) -> &'a syn::PathSegment {
-        if !self.option_detected(ty) {
+        if !ty.option_detected() {
             return ty.extract_outermost_type();
         } else {
             if let syn::PathArguments::AngleBracketed(item) = &ty.extract_outermost_type().arguments
@@ -360,10 +365,6 @@ impl DeriveData {
                 panic!("weird args")
             }
         }
-    }
-
-    fn option_detected(&self, ty: &syn::Type) -> bool {
-        &ty.extract_outermost_type().ident.to_string() == "Option"
     }
 
     fn is_association_field(&self, ty: &syn::Type) -> bool {
@@ -422,7 +423,7 @@ impl DeriveData {
     }
 
     fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
-        let is_option = self.option_detected(ty);
+        let is_option = ty.option_detected();
 
         if let Some((model, factory)) = self.extract_model_and_factory(ty) {
             Some(Association {
