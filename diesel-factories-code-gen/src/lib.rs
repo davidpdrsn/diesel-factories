@@ -158,13 +158,16 @@ impl MonkeyType for syn::Type {
             if types_we_care_about.len() != 2 {
                 return None;
             }
-            let model_type = types_we_care_about.first().unwrap();
-            let model = model_type.extract_outermost_type();
-            let model_tokens = model.normalize_lifetime_names();
-
-            let factory_type = types_we_care_about.last().unwrap();
-            let factory = factory_type.extract_outermost_type();
-            let factory_tokens = factory.normalize_lifetime_names();
+            let model_tokens = types_we_care_about
+                .first()
+                .unwrap()
+                .extract_outermost_type()
+                .normalize_lifetime_names();
+            let factory_tokens = types_we_care_about
+                .last()
+                .unwrap()
+                .extract_outermost_type()
+                .normalize_lifetime_names();
             return Some((model_tokens, factory_tokens));
         } else {
             None
