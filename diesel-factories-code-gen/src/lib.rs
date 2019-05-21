@@ -43,7 +43,24 @@ struct DeriveData {
     tokens: TokenStream,
 }
 
-trait Monkey {
+trait MonkeyPathSegment {
+    fn normalize_lifetime_names(&self) -> TokenStream;
+}
+
+impl MonkeyPathSegment for syn::PathSegment {
+    fn normalize_lifetime_names(&self) -> TokenStream {
+        if let syn::PathArguments::AngleBracketed(_args) = &self.arguments {
+            let ident = &self.ident;
+            return quote! {
+                #ident<'z>
+            };
+        } else {
+            return self.into_token_stream();
+        }
+    }
+}
+
+trait MonkeyType {
     fn to_string(&self) -> String;
     fn extract_outermost_type(&self) -> &syn::PathSegment;
     fn option_detected(&self) -> bool;
@@ -53,7 +70,7 @@ trait Monkey {
     fn parse_association_type(&self) -> Option<Association>;
 }
 
-impl Monkey for syn::Type {
+impl MonkeyType for syn::Type {
     fn parse_association_type(&self) -> Option<Association> {
         let is_option = self.option_detected();
 
@@ -146,26 +163,8 @@ impl Monkey for syn::Type {
             let model = model_type.extract_outermost_type();
             let factory_type = types_we_care_about.last().unwrap();
             let factory = factory_type.extract_outermost_type();
-            let model_tokens;
-            let factory_tokens;
-            // FIXME dedupe this code
-            if let syn::PathArguments::AngleBracketed(_args) = &model.arguments {
-                let ident = &model.ident;
-                model_tokens = quote! {
-                    #ident<'z>
-                };
-            } else {
-                model_tokens = model.into_token_stream();
-            }
-            // FIXME dedupe this code
-            if let syn::PathArguments::AngleBracketed(_args) = &factory.arguments {
-                let ident = &factory.ident;
-                factory_tokens = quote! {
-                    #ident<'z>
-                };
-            } else {
-                factory_tokens = factory.into_token_stream();
-            }
+            let model_tokens = model.normalize_lifetime_names();
+            let factory_tokens = factory.normalize_lifetime_names();
             return Some((model_tokens, factory_tokens));
         } else {
             None
