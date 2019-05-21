@@ -47,7 +47,7 @@ trait Monkey {
     fn to_string(&self) -> String;
     fn extract_outermost_type(&self) -> &syn::PathSegment;
     fn option_detected(&self) -> bool;
-    fn extract_outermost_non_optional(&self) -> &syn::PathSegment;
+    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment>;
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
     fn is_association_field(&self) -> bool;
     fn parse_association_type(&self) -> Option<Association>;
@@ -69,7 +69,10 @@ impl Monkey for syn::Type {
     }
 
     fn is_association_field(&self) -> bool {
-        self.extract_outermost_non_optional().ident.to_string() == "Association"
+        match self.extract_outermost_non_optional() {
+            None => false,
+            Some(extracted) => extracted.ident.to_string() == "Association",
+        }
     }
 
     fn to_string(&self) -> String {
@@ -96,9 +99,9 @@ impl Monkey for syn::Type {
         self.extract_outermost_type().ident.to_string() == "Option"
     }
 
-    fn extract_outermost_non_optional(&self) -> &syn::PathSegment {
+    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment> {
         if !self.option_detected() {
-            return self.extract_outermost_type();
+            return Some(self.extract_outermost_type());
         } else {
             if let syn::PathArguments::AngleBracketed(item) =
                 &self.extract_outermost_type().arguments
@@ -106,18 +109,19 @@ impl Monkey for syn::Type {
                 if let syn::GenericArgument::Type(unwrapped_type) =
                     &item.args.last().unwrap().value()
                 {
-                    return &unwrapped_type.extract_outermost_type();
-                } else {
-                    panic!("ack")
+                    return Some(&unwrapped_type.extract_outermost_type());
                 }
-            } else {
-                panic!("weird args")
             }
         }
+        None
     }
 
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
-        let path_segment = self.extract_outermost_non_optional();
+        let path_segment;
+        match self.extract_outermost_non_optional() {
+            None => return None,
+            Some(extracted) => path_segment = extracted,
+        }
         let syn::PathSegment {
             ident: _,
             arguments,
@@ -136,7 +140,7 @@ impl Monkey for syn::Type {
                 })
                 .collect();
             if types_we_care_about.len() != 2 {
-                panic!("should only have model and factory");
+                return None;
             }
             let model_type = types_we_care_about.first().unwrap();
             let model = model_type.extract_outermost_type();
