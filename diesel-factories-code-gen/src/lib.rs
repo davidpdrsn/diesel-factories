@@ -9,7 +9,18 @@ use darling::FromDeriveInput;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use quote::ToTokens;
 use syn::{parse_macro_input, DeriveInput};
+
+macro_rules! if_let_or_none {
+    ( $path:path , $($tokens:tt)* ) => {
+        if let $path(inner) = $($tokens)* {
+            inner
+        } else {
+            return None
+        }
+    };
+}
 
 #[proc_macro_derive(Factory, attributes(factory))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -39,6 +50,129 @@ struct DeriveData {
     input: DeriveInput,
     options: Options,
     tokens: TokenStream,
+}
+
+trait PathSegmentExtension {
+    fn normalize_lifetime_names(&self) -> TokenStream;
+}
+
+impl PathSegmentExtension for syn::PathSegment {
+    fn normalize_lifetime_names(&self) -> TokenStream {
+        if let syn::PathArguments::AngleBracketed(_args) = &self.arguments {
+            let ident = &self.ident;
+            return quote! {
+                #ident<'z>
+            };
+        } else {
+            return self.into_token_stream();
+        }
+    }
+}
+
+trait TypeExtension {
+    fn to_string(&self) -> String;
+    fn extract_outermost_type(&self) -> &syn::PathSegment;
+    fn is_inside_option(&self) -> bool;
+    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment>;
+    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
+    fn is_association_field(&self) -> bool;
+    fn parse_association_type(&self) -> Option<Association>;
+}
+
+impl TypeExtension for syn::Type {
+    fn parse_association_type(&self) -> Option<Association> {
+        let is_option = self.is_inside_option();
+
+        let (model, factory) = if_let_or_none!(Some, self.extract_model_and_factory());
+        Some(Association {
+            is_option,
+            model,
+            factory,
+        })
+    }
+
+    fn is_association_field(&self) -> bool {
+        match self.extract_outermost_non_optional() {
+            None => false,
+            Some(extracted) => extracted.ident.to_string() == "Association",
+        }
+    }
+
+    fn to_string(&self) -> String {
+        use quote::ToTokens;
+        let mut tokenized = quote! {};
+        self.to_tokens(&mut tokenized);
+        tokenized.to_string()
+    }
+
+    fn extract_outermost_type(&self) -> &syn::PathSegment {
+        if let syn::Type::Path(syn::TypePath { qself: _, path }) = self {
+            let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path;
+
+            &segments.last().unwrap().value()
+        } else {
+            panic!("Expected a TypePath here");
+        }
+    }
+
+    fn is_inside_option(&self) -> bool {
+        self.extract_outermost_type().ident.to_string() == "Option"
+    }
+
+    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment> {
+        if !self.is_inside_option() {
+            return Some(self.extract_outermost_type());
+        } else {
+            let item = if_let_or_none!(
+                syn::PathArguments::AngleBracketed,
+                &self.extract_outermost_type().arguments
+            );
+            let unwrapped_type = if_let_or_none!(
+                syn::GenericArgument::Type,
+                &item.args.last().unwrap().value()
+            );
+            return Some(&unwrapped_type.extract_outermost_type());
+        }
+    }
+
+    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
+        let path_segment;
+        match self.extract_outermost_non_optional() {
+            None => return None,
+            Some(extracted) => path_segment = extracted,
+        }
+        let syn::PathSegment {
+            ident: _,
+            arguments,
+        } = path_segment;
+        let item = if_let_or_none!(syn::PathArguments::AngleBracketed, arguments);
+
+        let types_we_care_about: Vec<_> = item
+            .args
+            .iter()
+            .filter_map(|token| {
+                let extracted = if_let_or_none!(syn::GenericArgument::Type, token);
+                return Some(extracted);
+            })
+            .collect();
+        if types_we_care_about.len() != 2 {
+            return None;
+        }
+        let model_tokens = types_we_care_about
+            .first()
+            .unwrap()
+            .extract_outermost_type()
+            .normalize_lifetime_names();
+        let factory_tokens = types_we_care_about
+            .last()
+            .unwrap()
+            .extract_outermost_type()
+            .normalize_lifetime_names();
+        return Some((model_tokens, factory_tokens));
+    }
 }
 
 impl DeriveData {
@@ -137,15 +271,15 @@ impl DeriveData {
     }
 
     fn struct_fields(&self) -> syn::punctuated::Iter<syn::Field> {
-        use syn::{Data, Fields};
-
         match &self.input.data {
-            Data::Union(_) => panic!("Factory can only be derived on structs"),
-            Data::Enum(_) => panic!("Factory can only be derived on structs"),
-            Data::Struct(data) => match &data.fields {
-                Fields::Named(named) => named.named.iter(),
-                Fields::Unit => panic!("Factory can only be derived on structs with named fields"),
-                Fields::Unnamed(_) => {
+            syn::Data::Union(_) => panic!("Factory can only be derived on structs"),
+            syn::Data::Enum(_) => panic!("Factory can only be derived on structs"),
+            syn::Data::Struct(data) => match &data.fields {
+                syn::Fields::Named(named) => named.named.iter(),
+                syn::Fields::Unit => {
+                    panic!("Factory can only be derived on structs with named fields")
+                }
+                syn::Fields::Unnamed(_) => {
                     panic!("Factory can only be derived on structs with named fields")
                 }
             },
@@ -164,7 +298,7 @@ impl DeriveData {
             .as_ref()
             .unwrap_or_else(|| panic!("Factory can only be derived for named fields"));
 
-        if let Some(association) = self.parse_association_type(&field.ty) {
+        if let Some(association) = field.ty.parse_association_type() {
             let foreign_key_field = ident(&format!("{}_id", name));
             if association.is_option {
                 quote! {
@@ -187,19 +321,6 @@ impl DeriveData {
         }
     }
 
-    fn is_association_field(&self, ty: &syn::Type) -> bool {
-        let as_string = self.type_to_string(ty);
-        as_string.contains("Association <")
-    }
-
-    fn type_to_string(&self, ty: &syn::Type) -> String {
-        use quote::ToTokens;
-
-        let mut tokenized = quote! {};
-        ty.to_tokens(&mut tokenized);
-        tokenized.to_string()
-    }
-
     fn builder_methods(&self) -> Vec<TokenStream> {
         self.struct_fields()
             .filter_map(|field| self.builder_method(field))
@@ -210,7 +331,7 @@ impl DeriveData {
         let name = &field.ident;
         let ty = &field.ty;
 
-        if self.is_association_field(&field.ty) {
+        if field.ty.is_association_field() {
             None
         } else {
             Some(quote! {
@@ -240,12 +361,12 @@ impl DeriveData {
     fn association_trait(&self, field: &syn::Field) -> Option<TokenStream> {
         use heck::CamelCase;
 
-        if self.is_association_field(&field.ty) {
+        if field.ty.is_association_field() {
             let factory = self.factory_name();
             let field_name = field.ident.as_ref().expect("field without name");
             let camel_field_name = field_name.to_string().to_camel_case();
 
-            let association = self.parse_association_type(&field.ty).unwrap_or_else(|| {
+            let association = field.ty.parse_association_type().unwrap_or_else(|| {
                 use std::fmt::Write;
                 let mut s = String::new();
                 writeln!(
@@ -259,15 +380,14 @@ impl DeriveData {
                 writeln!(s, "Association<'a, Model, Factory<'a>>").unwrap();
                 writeln!(s, "Option<Association<'a, Model, Factory<'a>>>").unwrap();
                 writeln!(s).unwrap();
-                writeln!(s, "Got\n{}", self.type_to_string(&field.ty)).unwrap();
+                writeln!(s, "Got\n{}", &field.ty.to_string()).unwrap();
                 panic!("{}", s);
             });
 
             let model = association.model;
             let other_factory = association.factory;
-
-            let other_factory_without_lifetime =
-                self.type_to_string(&other_factory).replace(" < 'a >", "");
+            let temp = other_factory.to_string();
+            let other_factory_without_lifetime = temp.split(" <").next().unwrap();
             let trait_name = ident(&format!(
                 "Set{}On{}For{}",
                 other_factory_without_lifetime, factory, camel_field_name
@@ -275,8 +395,8 @@ impl DeriveData {
 
             let model_impl = if association.is_option {
                 quote! {
-                    impl<'a> #trait_name<Option<&'a #model>> for #factory<'a> {
-                        fn #field_name(mut self, t: Option<&'a #model>) -> Self {
+                    impl<'z> #trait_name<Option<&'z #model>> for #factory<'z> {
+                        fn #field_name(mut self, t: Option<&'z #model>) -> Self {
                             self.#field_name = t.map(|k| diesel_factories::Association::new_model(k));
                             self
                         }
@@ -284,8 +404,8 @@ impl DeriveData {
                 }
             } else {
                 quote! {
-                    impl<'a> #trait_name<&'a #model> for #factory<'a> {
-                        fn #field_name(mut self, t: &'a #model) -> Self {
+                    impl<'z> #trait_name<&'z #model> for #factory<'z> {
+                        fn #field_name(mut self, t: &'z #model) -> Self {
                             self.#field_name = diesel_factories::Association::new_model(t);
                             self
                         }
@@ -295,7 +415,7 @@ impl DeriveData {
 
             let factory_impl = if association.is_option {
                 quote! {
-                    impl<'a> #trait_name<Option<#other_factory>> for #factory<'a> {
+                    impl<'z> #trait_name<Option<#other_factory>> for #factory<'z> {
                         fn #field_name(mut self, t: Option<#other_factory>) -> Self {
                             self.#field_name = t.map(|k| diesel_factories::Association::new_factory(k));
                             self
@@ -304,7 +424,7 @@ impl DeriveData {
                 }
             } else {
                 quote! {
-                    impl<'a> #trait_name<#other_factory> for #factory<'a> {
+                    impl<'z> #trait_name<#other_factory> for #factory<'z> {
                         fn #field_name(mut self, t: #other_factory) -> Self {
                             self.#field_name = diesel_factories::Association::new_factory(t);
                             self
@@ -327,35 +447,6 @@ impl DeriveData {
             None
         }
     }
-
-    fn parse_association_type(&self, ty: &syn::Type) -> Option<Association> {
-        use regex::Regex;
-
-        let re = Regex::new(
-            r"(Option < )?Association < 'a , (?P<model>[^ ]+) , (?P<factory>[^ ]+( < 'a >)?) >( >)?",
-        )
-        .unwrap();
-        let as_string = self.type_to_string(ty);
-        let caps = re.captures(&as_string)?;
-
-        let model = &caps["model"];
-        let model = syn::parse_str::<syn::Type>(model).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-
-        let factory = &caps["factory"];
-        let factory = syn::parse_str::<syn::Type>(factory).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
-
-        let is_option = as_string.contains("Option < ");
-
-        Some(Association {
-            is_option,
-            model,
-            factory,
-        })
-    }
 }
 
 fn ident(s: &str) -> syn::Ident {
@@ -364,6 +455,6 @@ fn ident(s: &str) -> syn::Ident {
 
 struct Association {
     is_option: bool,
-    model: syn::Type,
-    factory: syn::Type,
+    model: proc_macro2::TokenStream,
+    factory: proc_macro2::TokenStream,
 }
