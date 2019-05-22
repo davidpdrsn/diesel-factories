@@ -72,7 +72,7 @@ impl MonkeyPathSegment for syn::PathSegment {
 trait MonkeyType {
     fn to_string(&self) -> String;
     fn extract_outermost_type(&self) -> &syn::PathSegment;
-    fn option_detected(&self) -> bool;
+    fn is_inside_option(&self) -> bool;
     fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment>;
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
     fn is_association_field(&self) -> bool;
@@ -81,7 +81,7 @@ trait MonkeyType {
 
 impl MonkeyType for syn::Type {
     fn parse_association_type(&self) -> Option<Association> {
-        let is_option = self.option_detected();
+        let is_option = self.is_inside_option();
 
         let (model, factory) = if_let_or_none!(Some, self.extract_model_and_factory());
         Some(Association {
@@ -118,12 +118,12 @@ impl MonkeyType for syn::Type {
         }
     }
 
-    fn option_detected(&self) -> bool {
+    fn is_inside_option(&self) -> bool {
         self.extract_outermost_type().ident.to_string() == "Option"
     }
 
     fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment> {
-        if !self.option_detected() {
+        if !self.is_inside_option() {
             return Some(self.extract_outermost_type());
         } else {
             let item = if_let_or_none!(
