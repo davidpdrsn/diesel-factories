@@ -12,6 +12,16 @@ use quote::quote;
 use quote::ToTokens;
 use syn::{parse_macro_input, DeriveInput};
 
+macro_rules! if_let_or_none {
+    ( $path:path , $($tokens:tt)* ) => {
+        if let $path(inner) = $($tokens)* {
+            inner
+        } else {
+            return None
+        }
+    };
+}
+
 #[proc_macro_derive(Factory, attributes(factory))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -73,15 +83,12 @@ impl MonkeyType for syn::Type {
     fn parse_association_type(&self) -> Option<Association> {
         let is_option = self.option_detected();
 
-        if let Some((model, factory)) = self.extract_model_and_factory() {
-            Some(Association {
-                is_option,
-                model,
-                factory,
-            })
-        } else {
-            None
-        }
+        let (model, factory) = if_let_or_none!(Some, self.extract_model_and_factory());
+        Some(Association {
+            is_option,
+            model,
+            factory,
+        })
     }
 
     fn is_association_field(&self) -> bool {
@@ -119,17 +126,16 @@ impl MonkeyType for syn::Type {
         if !self.option_detected() {
             return Some(self.extract_outermost_type());
         } else {
-            if let syn::PathArguments::AngleBracketed(item) =
+            let item = if_let_or_none!(
+                syn::PathArguments::AngleBracketed,
                 &self.extract_outermost_type().arguments
-            {
-                if let syn::GenericArgument::Type(unwrapped_type) =
-                    &item.args.last().unwrap().value()
-                {
-                    return Some(&unwrapped_type.extract_outermost_type());
-                }
-            }
+            );
+            let unwrapped_type = if_let_or_none!(
+                syn::GenericArgument::Type,
+                &item.args.last().unwrap().value()
+            );
+            return Some(&unwrapped_type.extract_outermost_type());
         }
-        None
     }
 
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
@@ -142,36 +148,30 @@ impl MonkeyType for syn::Type {
             ident: _,
             arguments,
         } = path_segment;
+        let item = if_let_or_none!(syn::PathArguments::AngleBracketed, arguments);
 
-        if let syn::PathArguments::AngleBracketed(item) = arguments {
-            let types_we_care_about: Vec<_> = item
-                .args
-                .iter()
-                .filter_map(|token| {
-                    if let syn::GenericArgument::Type(extracted) = token {
-                        return Some(extracted);
-                    } else {
-                        return None;
-                    }
-                })
-                .collect();
-            if types_we_care_about.len() != 2 {
-                return None;
-            }
-            let model_tokens = types_we_care_about
-                .first()
-                .unwrap()
-                .extract_outermost_type()
-                .normalize_lifetime_names();
-            let factory_tokens = types_we_care_about
-                .last()
-                .unwrap()
-                .extract_outermost_type()
-                .normalize_lifetime_names();
-            return Some((model_tokens, factory_tokens));
-        } else {
-            None
+        let types_we_care_about: Vec<_> = item
+            .args
+            .iter()
+            .filter_map(|token| {
+                let extracted = if_let_or_none!(syn::GenericArgument::Type, token);
+                return Some(extracted);
+            })
+            .collect();
+        if types_we_care_about.len() != 2 {
+            return None;
         }
+        let model_tokens = types_we_care_about
+            .first()
+            .unwrap()
+            .extract_outermost_type()
+            .normalize_lifetime_names();
+        let factory_tokens = types_we_care_about
+            .last()
+            .unwrap()
+            .extract_outermost_type()
+            .normalize_lifetime_names();
+        return Some((model_tokens, factory_tokens));
     }
 }
 
