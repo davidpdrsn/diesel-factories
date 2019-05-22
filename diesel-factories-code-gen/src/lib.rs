@@ -52,11 +52,11 @@ struct DeriveData {
     tokens: TokenStream,
 }
 
-trait MonkeyPathSegment {
+trait PathSegmentExtension {
     fn normalize_lifetime_names(&self) -> TokenStream;
 }
 
-impl MonkeyPathSegment for syn::PathSegment {
+impl PathSegmentExtension for syn::PathSegment {
     fn normalize_lifetime_names(&self) -> TokenStream {
         if let syn::PathArguments::AngleBracketed(_args) = &self.arguments {
             let ident = &self.ident;
@@ -69,7 +69,7 @@ impl MonkeyPathSegment for syn::PathSegment {
     }
 }
 
-trait MonkeyType {
+trait TypeExtension {
     fn to_string(&self) -> String;
     fn extract_outermost_type(&self) -> &syn::PathSegment;
     fn is_inside_option(&self) -> bool;
@@ -79,7 +79,7 @@ trait MonkeyType {
     fn parse_association_type(&self) -> Option<Association>;
 }
 
-impl MonkeyType for syn::Type {
+impl TypeExtension for syn::Type {
     fn parse_association_type(&self) -> Option<Association> {
         let is_option = self.is_inside_option();
 
