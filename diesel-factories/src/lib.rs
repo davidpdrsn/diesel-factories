@@ -479,3 +479,15 @@ where
     let count = SEQUENCE_COUNTER.load(Ordering::Relaxed);
     f(count)
 }
+
+#[cfg(test)]
+mod test {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn test_compile_pass() {
+        let t = trybuild::TestCases::new();
+        t.pass("tests/compile_pass/*.rs");
+    }
+}

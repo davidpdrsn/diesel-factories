@@ -19,3 +19,4 @@ lazy_static = "^1.3"
 
 [dev_dependencies]
 diesel = { version = "^1.3", features = ["postgres"] }
+trybuild = "1.0.3"

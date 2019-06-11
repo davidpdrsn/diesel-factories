@@ -199,7 +199,7 @@ impl DeriveData {
         let id_type = self.id_type();
         let connection_type = self.connection_type();
         let table_path = self.table_path();
-        let values = self.diesel_insert_values();
+        let insert_code = self.insert_code();
 
         self.tokens.extend(quote! {
             impl#generics diesel_factories::Factory for #factory#generics {
@@ -210,13 +210,9 @@ impl DeriveData {
                 fn insert(self, con: &Self::Connection) -> Self::Model {
                     use #table_path::dsl::*;
                     use #table_path as table;
-
                     use diesel::prelude::*;
-                    let values = ( #(#values),* );
-                    diesel::insert_into(table::table)
-                        .values(values)
-                        .get_result::<Self::Model>(con)
-                        .unwrap()
+
+                    #insert_code
                 }
 
                 fn id_for_model(model: &Self::Model) -> &Self::Id {
@@ -224,6 +220,27 @@ impl DeriveData {
                 }
             }
         });
+    }
+
+    fn insert_code(&self) -> TokenStream {
+        let values = self.diesel_insert_values();
+
+        if self.no_fields() {
+            quote! {
+                diesel::insert_into(table::table)
+                    .default_values()
+                    .get_result::<Self::Model>(con)
+                    .unwrap()
+            }
+        } else {
+            quote! {
+                let values = ( #(#values),* );
+                diesel::insert_into(table::table)
+                    .values(values)
+                    .get_result::<Self::Model>(con)
+                    .unwrap()
+            }
+        }
     }
 
     fn gen_builder_methods(&mut self) {
@@ -284,6 +301,10 @@ impl DeriveData {
                 }
             },
         }
+    }
+
+    fn no_fields(&self) -> bool {
+        self.struct_fields().count() == 0
     }
 
     fn diesel_insert_values(&self) -> Vec<TokenStream> {
