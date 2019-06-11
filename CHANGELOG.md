@@ -8,7 +8,7 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ### Added
 
-- Support factories that just have an `id` field.
+N/A
 
 ### Changed
 
@@ -22,6 +22,12 @@ N/A
 
 N/A
 
+## [0.1.1]
+
+### Added
+
+- Support creating factories for models that just have an `id` field.
+
 ## [0.1.0]
 
 Completely rewritten implementation with a much nicer API.
@@ -30,4 +36,5 @@ Completely rewritten implementation with a much nicer API.
 
 Initial release.
 
+[0.1.1]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/davidpdrsn/diesel-factories/compare/0.0.1...0.1.0
