@@ -38,7 +38,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 #[derive(FromDeriveInput, Debug)]
 #[darling(attributes(factory), forward_attrs(doc, cfg, allow))]
 struct Options {
-    model: syn::Ident,
+    model: syn::Path,
     #[darling(default)]
     connection: Option<syn::Path>,
     #[darling(default)]
@@ -99,7 +99,6 @@ impl TypeExtension for syn::Type {
     }
 
     fn to_string(&self) -> String {
-        use quote::ToTokens;
         let mut tokenized = quote! {};
         self.to_tokens(&mut tokenized);
         tokenized.to_string()
@@ -259,7 +258,7 @@ impl DeriveData {
         &self.input.ident
     }
 
-    fn model_type(&self) -> &syn::Ident {
+    fn model_type(&self) -> &syn::Path {
         &self.options.model
     }
 
