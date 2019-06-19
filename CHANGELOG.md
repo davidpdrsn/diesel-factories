@@ -8,7 +8,7 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ### Added
 
-- Support for using path names for models.
+N/A
 
 ### Changed
 
@@ -21,6 +21,10 @@ N/A
 ### Fixed
 
 N/A
+
+## [0.1.2]
+
+- Support for using path names for models.
 
 ## [0.1.1]
 
@@ -36,5 +40,6 @@ Completely rewritten implementation with a much nicer API.
 
 Initial release.
 
+[0.1.2]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/davidpdrsn/diesel-factories/compare/0.0.1...0.1.0

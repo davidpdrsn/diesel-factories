@@ -10,11 +10,11 @@ license = "MIT"
 name = "diesel-factories"
 readme = "README.md"
 repository = "https://github.com/davidpdrsn/diesel-factories.git"
-version = "0.1.1"
+version = "0.1.2"
 
 [dependencies]
 diesel = { version = "^1" }
-diesel-factories-code-gen = { version = "0.1.1", path = "../diesel-factories-code-gen" }
+diesel-factories-code-gen = { version = "0.1.2", path = "../diesel-factories-code-gen" }
 lazy_static = "^1.3"
 
 [dev_dependencies]
