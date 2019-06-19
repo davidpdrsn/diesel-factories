@@ -38,7 +38,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 #[derive(FromDeriveInput, Debug)]
 #[darling(attributes(factory), forward_attrs(doc, cfg, allow))]
 struct Options {
-    model: syn::Ident,
+    model: syn::Path,
     #[darling(default)]
     connection: Option<syn::Path>,
     #[darling(default)]
@@ -52,23 +52,6 @@ struct DeriveData {
     tokens: TokenStream,
 }
 
-trait PathSegmentExtension {
-    fn normalize_lifetime_names(&self) -> TokenStream;
-}
-
-impl PathSegmentExtension for syn::PathSegment {
-    fn normalize_lifetime_names(&self) -> TokenStream {
-        if let syn::PathArguments::AngleBracketed(_args) = &self.arguments {
-            let ident = &self.ident;
-            return quote! {
-                #ident<'z>
-            };
-        } else {
-            return self.into_token_stream();
-        }
-    }
-}
-
 trait TypeExtension {
     fn to_string(&self) -> String;
     fn extract_outermost_type(&self) -> &syn::PathSegment;
@@ -77,6 +60,7 @@ trait TypeExtension {
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
     fn is_association_field(&self) -> bool;
     fn parse_association_type(&self) -> Option<Association>;
+    fn normalize_lifetime_names(&self) -> TokenStream;
 }
 
 impl TypeExtension for syn::Type {
@@ -99,7 +83,6 @@ impl TypeExtension for syn::Type {
     }
 
     fn to_string(&self) -> String {
-        use quote::ToTokens;
         let mut tokenized = quote! {};
         self.to_tokens(&mut tokenized);
         tokenized.to_string()
@@ -138,6 +121,28 @@ impl TypeExtension for syn::Type {
         }
     }
 
+    fn normalize_lifetime_names(&self) -> TokenStream {
+        if let syn::Type::Path(syn::TypePath { qself: _, path }) = self {
+            let syn::Path {
+                leading_colon: _,
+                segments,
+            } = path;
+
+            let seg = segments.last().unwrap();
+            let seg_value = seg.value();
+            if let syn::PathArguments::AngleBracketed(_args) = &seg_value.arguments {
+                let ident = &seg_value.ident;
+                return quote! {
+                    #ident<'z>
+                };
+            } else {
+                return self.into_token_stream();
+            }
+        } else {
+            panic!("Expected a TypePath here");
+        }
+    }
+
     fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
         let path_segment;
         match self.extract_outermost_non_optional() {
@@ -164,12 +169,10 @@ impl TypeExtension for syn::Type {
         let model_tokens = types_we_care_about
             .first()
             .unwrap()
-            .extract_outermost_type()
             .normalize_lifetime_names();
         let factory_tokens = types_we_care_about
             .last()
             .unwrap()
-            .extract_outermost_type()
             .normalize_lifetime_names();
         return Some((model_tokens, factory_tokens));
     }
@@ -259,7 +262,7 @@ impl DeriveData {
         &self.input.ident
     }
 
-    fn model_type(&self) -> &syn::Ident {
+    fn model_type(&self) -> &syn::Path {
         &self.options.model
     }
 
