@@ -24,6 +24,10 @@ N/A
 
 ## [0.1.2]
 
+No changes were made but the API is now considered stable.
+
+## [0.1.2]
+
 - Support for using path names for models.
 
 ## [0.1.1]
@@ -40,6 +44,7 @@ Completely rewritten implementation with a much nicer API.
 
 Initial release.
 
+[1.0.0]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.2...1.0.0
 [0.1.2]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/davidpdrsn/diesel-factories/compare/0.0.1...0.1.0
