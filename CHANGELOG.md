@@ -22,7 +22,7 @@ N/A
 
 N/A
 
-## [0.1.2]
+## [1.0.0]
 
 No changes were made but the API is now considered stable.
 
