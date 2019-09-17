@@ -1,5 +1,6 @@
 //! See the docs for "diesel-factories" for more info about this.
 
+#![deny(mutable_borrow_reservation_conflict)]
 #![recursion_limit = "128"]
 
 extern crate proc_macro;
@@ -204,7 +205,7 @@ impl DeriveData {
         let table_path = self.table_path();
         let insert_code = self.insert_code();
 
-        self.tokens.extend(quote! {
+        let code = quote! {
             impl#generics diesel_factories::Factory for #factory#generics {
                 type Model = #model_type;
                 type Id = #id_type;
@@ -222,7 +223,8 @@ impl DeriveData {
                     &model.id
                 }
             }
-        });
+        };
+        self.tokens.extend(code);
     }
 
     fn insert_code(&self) -> TokenStream {
@@ -251,11 +253,12 @@ impl DeriveData {
         let generics = self.factory_generics();
         let methods = self.builder_methods();
 
-        self.tokens.extend(quote! {
+        let code = quote! {
             impl#generics #factory#generics {
                 #(#methods)*
             }
-        })
+        };
+        self.tokens.extend(code)
     }
 
     fn factory_name(&self) -> &syn::Ident {
