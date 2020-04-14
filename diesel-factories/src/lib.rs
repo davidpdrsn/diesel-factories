@@ -12,10 +12,11 @@
 //! use diesel::{pg::PgConnection, prelude::*};
 //!
 //! // Tell Diesel what our schema is
+//! // Note unusual primary key name - see options for derive macro.
 //! mod schema {
 //!     table! {
-//!         countries (id) {
-//!             id -> Integer,
+//!         countries (identity) {
+//!             identity -> Integer,
 //!             name -> Text,
 //!         }
 //!     }
@@ -72,7 +73,7 @@
 //! // The same setup, but for `Country`
 //! #[derive(Clone, Queryable)]
 //! struct Country {
-//!     pub id: i32,
+//!     pub identity: i32,
 //!     pub name: String,
 //! }
 //!
@@ -82,6 +83,7 @@
 //!     table = "crate::schema::countries",
 //!     connection = "diesel::pg::PgConnection",
 //!     id = "i32",
+//!     id_name = "identity",
 //! )]
 //! struct CountryFactory {
 //!     pub name: String,
@@ -176,7 +178,7 @@
 //! fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
 //!     use crate::schema::countries::dsl::*;
 //!     countries
-//!         .filter(id.eq(&input))
+//!         .filter(identity.eq(&input))
 //!         .first::<Country>(con)
 //!         .unwrap()
 //! }
