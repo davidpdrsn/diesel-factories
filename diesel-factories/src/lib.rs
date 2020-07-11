@@ -357,6 +357,7 @@
 
 #![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.0")]
 #![deny(
+    mutable_borrow_reservation_conflict,
     missing_docs,
     missing_debug_implementations,
     missing_copy_implementations,

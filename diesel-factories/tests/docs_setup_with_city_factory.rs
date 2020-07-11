@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate diesel;
 
-use diesel::{pg::PgConnection, prelude::*};
 use diesel_factories::{Association, Factory};
 
 mod schema {
