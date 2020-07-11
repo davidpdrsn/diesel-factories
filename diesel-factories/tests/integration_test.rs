@@ -19,8 +19,8 @@ mod schema {
     }
 
     table! {
-        countries (id) {
-            id -> Integer,
+        countries (identity) {
+            identity -> Integer,
             name -> Text,
         }
     }
@@ -48,7 +48,7 @@ struct User {
 
 #[derive(Queryable, Clone)]
 struct Country {
-    pub id: i32,
+    pub identity: i32,
     pub name: String,
 }
 
@@ -88,7 +88,11 @@ impl<'b> Default for UserFactory<'b> {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "Country", table = "crate::schema::countries")]
+#[factory(
+    model = "Country",
+    table = "crate::schema::countries",
+    id_name = "identity"
+)]
 struct CountryFactory {
     pub name: String,
 }
@@ -183,7 +187,7 @@ fn count_countries(con: &PgConnection) -> i64 {
 fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
     use crate::schema::countries::dsl::*;
     countries
-        .filter(id.eq(&input))
+        .filter(identity.eq(&input))
         .first::<Country>(con)
         .unwrap()
 }
