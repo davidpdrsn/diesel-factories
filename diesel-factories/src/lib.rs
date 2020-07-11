@@ -358,7 +358,7 @@
 //! # }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.0")]
+#![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.1")]
 #![deny(
     mutable_borrow_reservation_conflict,
     missing_docs,

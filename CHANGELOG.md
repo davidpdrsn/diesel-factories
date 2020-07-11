@@ -6,11 +6,15 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-- Add `id_name` attribute for customizing the name of the id column of your table. Previously this was hard coded to `id`.
+N/A
 
 ### Breaking changes
 
 N/A
+
+## [1.0.1]
+
+- Add `id_name` attribute for customizing the name of the id column of your table. Previously this was hard coded to `id`.
 
 ## [1.0.0]
 
@@ -34,6 +38,7 @@ Completely rewritten implementation with a much nicer API.
 
 Initial release.
 
+[1.0.1]: https://github.com/davidpdrsn/diesel-factories/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.2...1.0.0
 [0.1.2]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/davidpdrsn/diesel-factories/compare/0.1.0...0.1.1
