@@ -194,6 +194,7 @@
 //! | `table` | Table your model belongs to | `"crate::schema::cities"` | None, required |
 //! | `connection` | The connection type your app uses | `"MysqlConnection"` | `"diesel::pg::PgConnection"` |
 //! | `id` | The type of your table's primary key | `"i64"` | `"i32"` |
+//! | `id_name` | The name of your table's primary key column | `"identity"` | `"id"` |
 //!
 //! ### Builder methods
 //!

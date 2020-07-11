@@ -6,19 +6,9 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-### Added
+- Add `id_name` attribute for customizing the name of the id column of your table. Previously this was hard coded to `id`.
 
-N/A
-
-### Changed
-
-N/A
-
-### Removed
-
-N/A
-
-### Fixed
+### Breaking changes
 
 N/A
 
