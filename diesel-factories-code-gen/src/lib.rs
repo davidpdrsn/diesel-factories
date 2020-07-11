@@ -1,5 +1,6 @@
 //! See the docs for "diesel-factories" for more info about this.
 
+#![deny(mutable_borrow_reservation_conflict)]
 #![recursion_limit = "128"]
 #![deny(
     mutable_borrow_reservation_conflict,
@@ -54,6 +55,8 @@ struct Options {
     connection: Option<syn::Path>,
     #[darling(default)]
     id: Option<syn::Ident>,
+    #[darling(default)]
+    id_name: Option<syn::Ident>,
     table: syn::Path,
 }
 
@@ -210,6 +213,7 @@ impl DeriveData {
         let factory = self.factory_name();
         let generics = self.factory_generics();
         let model_type = self.model_type();
+        let id_name = self.id_name();
         let id_type = self.id_type();
         let connection_type = self.connection_type();
         let table_path = self.table_path();
@@ -230,7 +234,7 @@ impl DeriveData {
                 }
 
                 fn id_for_model(model: &Self::Model) -> &Self::Id {
-                    &model.id
+                    &model.#id_name
                 }
             }
         };
@@ -285,6 +289,14 @@ impl DeriveData {
             .as_ref()
             .map(|inner| quote! { #inner })
             .unwrap_or_else(|| quote! { i32 })
+    }
+
+    fn id_name(&self) -> TokenStream {
+        self.options
+            .id_name
+            .as_ref()
+            .map(|inner| quote! { #inner })
+            .unwrap_or(quote! { id })
     }
 
     fn connection_type(&self) -> TokenStream {
