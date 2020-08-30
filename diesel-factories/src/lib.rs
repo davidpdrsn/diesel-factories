@@ -188,6 +188,8 @@
 //!
 //! ### Attributes
 //!
+//! These attributes are available on the struct itself inside `#[factory(...)]`.
+//!
 //! | Name | Description | Example | Default |
 //! |---|---|---|---|
 //! | `model` | Model type your factory inserts | `City` | None, required |
@@ -195,6 +197,12 @@
 //! | `connection` | The connection type your app uses | `MysqlConnection` | `diesel::pg::PgConnection` |
 //! | `id` | The type of your table's primary key | `i64` | `i32` |
 //! | `id_name` | The name of your table's primary key column | `identity` | `id` |
+//!
+//! These attributes are available on association fields inside `#[factory(...)]`.
+//!
+//! | Name | Description | Example | Default |
+//! |---|---|---|---|
+//! | `foreign_key_name` | Name of the foreign key column on your model | `country_identity` | `{association_name}_id` |
 //!
 //! ### Builder methods
 //!
@@ -361,6 +369,34 @@
 //! UserFactory::default().country(Option::<&Country>::None);
 //! # }
 //! ```
+//!
+//! ### Customizing foreign key names
+//!
+//! You can customize the name of the foreign key for your associations like so
+//!
+//! ```
+//! # #![allow(unused_imports)]
+//! # include!("../tests/docs_setup.rs");
+//! #
+//! #[derive(Clone, Factory)]
+//! #[factory(
+//!     model = City,
+//!     table = crate::schema::cities,
+//! )]
+//! struct CityFactory<'a> {
+//!     #[factory(foreign_key_name = country_id)]
+//!     pub country: Association<'a, Country, CountryFactory>,
+//! #   pub name: String,
+//! }
+//! #
+//! # impl<'a> Default for CityFactory<'a> {
+//! #     fn default() -> Self {
+//! #         unimplemented!()
+//! #     }
+//! # }
+//! #
+//! # fn main() {}
+//! ```
 #![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.1")]
 #![deny(
     mutable_borrow_reservation_conflict,
@@ -496,5 +532,6 @@ mod test {
     fn test_compile_pass() {
         let t = trybuild::TestCases::new();
         t.pass("tests/compile_pass/*.rs");
+        t.compile_fail("tests/compile_fail/*.rs");
     }
 }

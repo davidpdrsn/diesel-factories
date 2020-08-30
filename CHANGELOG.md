@@ -6,8 +6,30 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-- Code generation as been rewritten and should provide better error messages.
-- syn, quote, and proc-macro2 dependencies have been migrated to version 1.0.
+Code generation as been rewritten and should provide better error messages.
+
+syn, quote, and proc-macro2 dependencies have been migrated to version 1.0.
+
+Support customizing foreign key name with `#[factory(foreign_key_name = _)]` on association fields:
+
+```rust
+mod schema {
+    table! {
+        users (id) {
+            id -> Integer,
+            age -> Integer,
+            country_id -> Integer,
+        }
+    }
+}
+
+#[derive(Clone, Factory)]
+#[factory(model = User, table = crate::schema::users)]
+struct UserFactory<'a> {
+    #[factory(foreign_key_name = country_id)]
+    pub country: Association<'a, Country, CountryFactory>,
+}
+```
 
 ### Breaking changes
 

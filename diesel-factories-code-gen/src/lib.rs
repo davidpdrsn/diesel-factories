@@ -14,7 +14,6 @@
     unused_qualifications
 )]
 
-use bae::FromAttributes;
 use heck::CamelCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -35,13 +34,28 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     proc_macro::TokenStream::from(tokens)
 }
 
-#[derive(Debug, FromAttributes)]
-struct Factory {
-    model: Type,
-    table: Path,
-    connection: Option<Type>,
-    id: Option<Type>,
-    id_name: Option<Ident>,
+mod struct_attr {
+    use bae::FromAttributes;
+    use syn::{Ident, Path, Type};
+
+    #[derive(Debug, FromAttributes)]
+    pub struct Factory {
+        pub model: Type,
+        pub table: Path,
+        pub connection: Option<Type>,
+        pub id: Option<Type>,
+        pub id_name: Option<Ident>,
+    }
+}
+
+mod field_attr {
+    use bae::FromAttributes;
+    use syn::Ident;
+
+    #[derive(Debug, FromAttributes)]
+    pub struct Factory {
+        pub foreign_key_name: Ident,
+    }
 }
 
 #[derive(Debug)]
@@ -53,7 +67,7 @@ struct Input {
     id_name: Ident,
     factory_name: Ident,
     fields: Vec<(Ident, Type)>,
-    associations: Vec<(Ident, AssociationType)>,
+    associations: Vec<(Ident, AssociationType, Ident)>,
     lifetime: Option<Lifetime>,
 }
 
@@ -70,13 +84,13 @@ impl Parse for Input {
             vis: _,
         } = input.parse::<ItemStruct>()?;
 
-        let Factory {
+        let struct_attr::Factory {
             model,
             table,
             connection,
             id,
             id_name,
-        } = Factory::from_attributes(&attrs)?;
+        } = struct_attr::Factory::from_attributes(&attrs)?;
 
         let connection =
             connection.unwrap_or_else(|| syn::parse2(quote! { diesel::pg::PgConnection }).unwrap());
@@ -102,8 +116,22 @@ impl Parse for Input {
             };
 
             if let Ok(association_type) = AssociationType::new(field_ty) {
-                associations.push((name, association_type));
+                let foreign_key_name =
+                    if let Some(attr) = field_attr::Factory::try_from_attributes(&field.attrs)? {
+                        attr.foreign_key_name
+                    } else {
+                        format_ident!("{}_id", name)
+                    };
+
+                associations.push((name, association_type, foreign_key_name));
             } else {
+                if field_attr::Factory::from_attributes(&field.attrs).is_ok() {
+                    return Err(syn::Error::new(
+                        field_span,
+                        "`#[factory]` attributes are only allowed on association fields",
+                    ));
+                }
+
                 fields.push((name, field.ty));
             }
         }
@@ -177,24 +205,24 @@ impl Input {
             let values = self.fields.iter().map(|(name, _)| {
                 quote! { #table_path::#name.eq(&self.#name) }
             });
-            let values = values.chain(self.associations.iter().map(|(name, association_type)| {
-                let foreign_key_field = format_ident!("{}_id", name);
-
-                if association_type.is_optional {
-                    quote! {
-                        {
-                            let value = self.#name.map(|inner| {
-                                inner.insert_returning_id(con)
-                            });
-                            #table_path::#foreign_key_field.eq(value)
+            let values = values.chain(self.associations.iter().map(
+                |(name, association_type, foreign_key_field)| {
+                    if association_type.is_optional {
+                        quote! {
+                            {
+                                let value = self.#name.map(|inner| {
+                                    inner.insert_returning_id(con)
+                                });
+                                #table_path::#foreign_key_field.eq(value)
+                            }
+                        }
+                    } else {
+                        quote! {
+                            #table_path::#foreign_key_field.eq(self.#name.insert_returning_id(con))
                         }
                     }
-                } else {
-                    quote! {
-                        #table_path::#foreign_key_field.eq(self.#name.insert_returning_id(con))
-                    }
-                }
-            }));
+                },
+            ));
 
             quote! {
                 let values = ( #(#values),* );
@@ -252,7 +280,7 @@ impl Input {
     fn association_builder_methods(&self) -> TokenStream {
         let factory_name = &self.factory_name;
 
-        self.associations.iter().map(|(field_name, association_type)| {
+        self.associations.iter().map(|(field_name, association_type, _)| {
             let association_name = format_ident!("{}", field_name.to_string().to_camel_case());
             let trait_name = format_ident!("Set{}On{}", association_name, factory_name);
 
