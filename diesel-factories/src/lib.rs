@@ -41,13 +41,13 @@
 //! #[derive(Clone, Factory)]
 //! #[factory(
 //!     // model type our factory inserts
-//!     model = "City",
+//!     model = City,
 //!     // table the model belongs to
-//!     table = "crate::schema::cities",
+//!     table = crate::schema::cities,
 //!     // connection type you use. Defaults to `PgConnection`
-//!     connection = "diesel::pg::PgConnection",
+//!     connection = diesel::pg::PgConnection,
 //!     // type of primary key. Defaults to `i32`
-//!     id = "i32",
+//!     id = i32,
 //! )]
 //! struct CityFactory<'a> {
 //!     pub name: String,
@@ -79,11 +79,11 @@
 //!
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "Country",
-//!     table = "crate::schema::countries",
-//!     connection = "diesel::pg::PgConnection",
-//!     id = "i32",
-//!     id_name = "identity",
+//!     model = Country,
+//!     table = crate::schema::countries,
+//!     connection = diesel::pg::PgConnection,
+//!     id = i32,
+//!     id_name = identity,
 //! )]
 //! struct CountryFactory {
 //!     pub name: String,
@@ -190,11 +190,11 @@
 //!
 //! | Name | Description | Example | Default |
 //! |---|---|---|---|
-//! | `model` | Model type your factory inserts | `"City"` | None, required |
-//! | `table` | Table your model belongs to | `"crate::schema::cities"` | None, required |
-//! | `connection` | The connection type your app uses | `"MysqlConnection"` | `"diesel::pg::PgConnection"` |
-//! | `id` | The type of your table's primary key | `"i64"` | `"i32"` |
-//! | `id_name` | The name of your table's primary key column | `"identity"` | `"id"` |
+//! | `model` | Model type your factory inserts | `City` | None, required |
+//! | `table` | Table your model belongs to | `crate::schema::cities` | None, required |
+//! | `connection` | The connection type your app uses | `MysqlConnection` | `diesel::pg::PgConnection` |
+//! | `id` | The type of your table's primary key | `i64` | `i32` |
+//! | `id_name` | The name of your table's primary key column | `identity` | `id` |
 //!
 //! ### Builder methods
 //!
@@ -235,8 +235,8 @@
 //! #
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "City",
-//!     table = "crate::schema::cities",
+//!     model = City,
+//!     table = crate::schema::cities,
 //! )]
 //! struct CityFactory<'a> {
 //!     pub name: String,
@@ -260,8 +260,8 @@
 //! #
 //! # #[derive(Clone, Factory)]
 //! # #[factory(
-//! #     model = "City",
-//! #     table = "crate::schema::cities",
+//! #     model = City,
+//! #     table = crate::schema::cities,
 //! # )]
 //! # struct CityFactory<'a> {
 //! #     pub name: String,
@@ -290,8 +290,8 @@
 //! #
 //! # #[derive(Clone, Factory)]
 //! # #[factory(
-//! #     model = "City",
-//! #     table = "crate::schema::cities",
+//! #     model = City,
+//! #     table = crate::schema::cities,
 //! # )]
 //! # struct CityFactory<'a> {
 //! #     pub name: String,
@@ -324,8 +324,8 @@
 //! #
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "User",
-//!     table = "crate::schema::users",
+//!     model = User,
+//!     table = crate::schema::users,
 //! )]
 //! struct UserFactory<'a> {
 //!     pub name: String,
@@ -361,7 +361,6 @@
 //! UserFactory::default().country(Option::<&Country>::None);
 //! # }
 //! ```
-
 #![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.1")]
 #![deny(
     mutable_borrow_reservation_conflict,

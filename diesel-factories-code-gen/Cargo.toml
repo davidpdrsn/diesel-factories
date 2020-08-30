@@ -12,12 +12,11 @@ repository = "https://github.com/davidpdrsn/diesel-factories.git"
 version = "1.0.1"
 
 [dependencies]
-proc-macro2 = "^0.4"
-quote = "^0.6"
-syn = "^0.15"
-darling = "^0.9"
-regex = "^1.1"
-heck = "^0.3"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "1", features = ["full"] }
+heck = "0.3"
+bae = "0.1"
 
 [lib]
 proc-macro = true

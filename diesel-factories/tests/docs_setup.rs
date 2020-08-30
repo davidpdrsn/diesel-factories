@@ -35,7 +35,7 @@ struct Country {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "Country", table = "crate::schema::countries")]
+#[factory(model = Country, table = crate::schema::countries)]
 struct CountryFactory {
     pub name: String,
 }

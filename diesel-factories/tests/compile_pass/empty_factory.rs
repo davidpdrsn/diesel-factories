@@ -21,9 +21,9 @@ struct User {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "User",
-    table = "crate::schema::users",
-    connection = "diesel::pg::PgConnection"
+    model = User,
+    table = crate::schema::users,
+    connection = diesel::pg::PgConnection
 )]
 struct UserFactory {}
 

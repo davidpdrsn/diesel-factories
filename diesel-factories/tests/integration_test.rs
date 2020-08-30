@@ -63,9 +63,9 @@ struct City {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "User",
-    table = "crate::schema::users",
-    connection = "diesel::pg::PgConnection"
+    model = User,
+    table = crate::schema::users,
+    connection = diesel::pg::PgConnection
 )]
 struct UserFactory<'b> {
     pub name: String,
@@ -89,9 +89,9 @@ impl<'b> Default for UserFactory<'b> {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "Country",
-    table = "crate::schema::countries",
-    id_name = "identity"
+    model = Country,
+    table = crate::schema::countries,
+    id_name = identity
 )]
 struct CountryFactory {
     pub name: String,
@@ -106,7 +106,7 @@ impl Default for CountryFactory {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "City", table = "crate::schema::cities")]
+#[factory(model = City, table = crate::schema::cities)]
 struct CityFactory<'b> {
     pub name: String,
     pub team_association: String,
