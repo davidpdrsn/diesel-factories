@@ -81,7 +81,7 @@ impl TypeExtension for syn::Type {
     fn parse_association_type(&self) -> Option<Association> {
         let is_option = self.is_inside_option();
 
-        let (model, factory) = if_let_or_none!(Some, self.extract_model_and_factory());
+        let (model, factory) = self.extract_model_and_factory()?;
         Some(Association {
             is_option,
             model,
@@ -92,7 +92,7 @@ impl TypeExtension for syn::Type {
     fn is_association_field(&self) -> bool {
         match self.extract_outermost_non_optional() {
             None => false,
-            Some(extracted) => extracted.ident.to_string() == "Association",
+            Some(extracted) => extracted.ident == "Association",
         }
     }
 
@@ -116,12 +116,12 @@ impl TypeExtension for syn::Type {
     }
 
     fn is_inside_option(&self) -> bool {
-        self.extract_outermost_type().ident.to_string() == "Option"
+        self.extract_outermost_type().ident == "Option"
     }
 
     fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment> {
         if !self.is_inside_option() {
-            return Some(self.extract_outermost_type());
+            Some(self.extract_outermost_type())
         } else {
             let item = if_let_or_none!(
                 syn::PathArguments::AngleBracketed,
@@ -131,7 +131,7 @@ impl TypeExtension for syn::Type {
                 syn::GenericArgument::Type,
                 &item.args.last().unwrap().value()
             );
-            return Some(&unwrapped_type.extract_outermost_type());
+            Some(&unwrapped_type.extract_outermost_type())
         }
     }
 
@@ -146,11 +146,9 @@ impl TypeExtension for syn::Type {
             let seg_value = seg.value();
             if let syn::PathArguments::AngleBracketed(_args) = &seg_value.arguments {
                 let ident = &seg_value.ident;
-                return quote! {
-                    #ident<'z>
-                };
+                quote! { #ident<'z> }
             } else {
-                return self.into_token_stream();
+                self.into_token_stream()
             }
         } else {
             panic!("Expected a TypePath here");
@@ -174,7 +172,7 @@ impl TypeExtension for syn::Type {
             .iter()
             .filter_map(|token| {
                 let extracted = if_let_or_none!(syn::GenericArgument::Type, token);
-                return Some(extracted);
+                Some(extracted)
             })
             .collect();
         if types_we_care_about.len() != 2 {
@@ -188,7 +186,7 @@ impl TypeExtension for syn::Type {
             .last()
             .unwrap()
             .normalize_lifetime_names();
-        return Some((model_tokens, factory_tokens));
+        Some((model_tokens, factory_tokens))
     }
 }
 

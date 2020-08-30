@@ -230,6 +230,7 @@
 //! The builder methods generated for `Association` fields are a bit different. If you have a factory like:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! #[derive(Clone, Factory)]
@@ -254,6 +255,7 @@
 //! You'll be able to call `country` either with an owned `CountryFactory`:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! # #[derive(Clone, Factory)]
@@ -283,6 +285,7 @@
 //! Or a borrowed `Country`:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! # #[derive(Clone, Factory)]
@@ -316,6 +319,7 @@
 //! If your model has a nullable association you can do this:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup_with_city_factory.rs");
 //! #
 //! #[derive(Clone, Factory)]
@@ -461,7 +465,7 @@ pub trait Factory: Clone {
 }
 
 lazy_static! {
-    static ref SEQUENCE_COUNTER: AtomicUsize = { AtomicUsize::new(0) };
+    static ref SEQUENCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 }
 
 /// Utility function for generating unique ids or strings in factories.
