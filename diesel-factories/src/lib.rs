@@ -441,7 +441,7 @@ where
 pub trait Factory: Clone {
     /// The model type the factory inserts.
     ///
-    /// For a factory named `UserFactory` this would probably be `Use`.
+    /// For a factory named `UserFactory` this would probably be `User`.
     type Model;
 
     /// The primary key type your model uses.
@@ -458,7 +458,7 @@ pub trait Factory: Clone {
     /// This will panic if the insert fails. Should be fine since you want panics early in tests.
     fn insert(self, con: &Self::Connection) -> Self::Model;
 
-    /// Get the primary id value for a model type.
+    /// Get the primary key value for a model type.
     ///
     /// Just a generic wrapper around `model.id`.
     fn id_for_model(model: &Self::Model) -> &Self::Id;
