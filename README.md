@@ -22,7 +22,7 @@ And also run migrations:
 
 ```sh
 cargo install diesel_cli --no-default-features --features postgres
-diesel migration run --database-url postgresql://localhost:5432/diesel_factories_test
+diesel migration run database-url postgresql://localhost:5432/diesel_factories_test
 ```
 
 ---
