@@ -348,7 +348,7 @@ impl DeriveData {
             .unwrap_or_else(|| panic!("Factory can only be derived for named fields"));
 
         if let Some(association) = field.ty.parse_association_type() {
-            let foreign_key_field = ident(&format!("{}_id", name));
+            let foreign_key_field = ident(&format!("{}_{}", name, self.id_name()));
             if association.is_option {
                 quote! {
                     {
