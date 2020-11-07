@@ -120,7 +120,7 @@ impl Parse for Input {
                     if let Some(attr) = field_attr::Factory::try_from_attributes(&field.attrs)? {
                         attr.foreign_key_name
                     } else {
-                        format_ident!("{}_id", name)
+                        format_ident!("{}_{}", name, id_name)
                     };
 
                 associations.push((name, association_type, foreign_key_name));
