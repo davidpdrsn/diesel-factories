@@ -156,7 +156,23 @@
 //! #     multiple_models_with_same_association();
 //! # }
 //! # fn establish_connection() -> PgConnection {
-//! #     let database_url = "postgres://localhost/diesel_factories_test";
+//! #     use std::env;
+//! #     let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+//! #     let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+//! #     let pg_password = env::var("POSTGRES_PASSWORD").ok();
+//! #
+//! #     let auth = if let Some(pg_password) = pg_password {
+//! #         format!("postgres:{}@", pg_password)
+//! #     } else {
+//! #         String::new()
+//! #     };
+//! #
+//! #     let database_url = format!(
+//! #         "postgres://{auth}{host}:{port}/diesel_factories_test",
+//! #         auth = auth,
+//! #         host = pg_host,
+//! #         port = pg_port
+//! #     );
 //! #     let con = PgConnection::establish(&database_url).unwrap();
 //! #     con.begin_test_transaction().unwrap();
 //! #     con
