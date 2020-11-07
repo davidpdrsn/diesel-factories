@@ -67,18 +67,18 @@ struct City {
     table = crate::schema::users,
     connection = diesel::pg::PgConnection
 )]
-struct UserFactory<'b> {
-    pub name: String,
+struct UserFactory<'a> {
+    pub name: &'a str,
     pub age: i32,
-    pub country: std::option::Option<diesel_factories::Association<'b, Country, CountryFactory>>,
-    pub home_city: Option<diesel_factories::Association<'b, City, CityFactory<'b>>>,
-    pub current_city: Option<Association<'b, City, CityFactory<'b>>>,
+    pub country: std::option::Option<diesel_factories::Association<'a, Country, CountryFactory>>,
+    pub home_city: Option<diesel_factories::Association<'a, City, CityFactory<'a>>>,
+    pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
 }
 
-impl<'b> Default for UserFactory<'b> {
+impl<'a> Default for UserFactory<'a> {
     fn default() -> Self {
         Self {
-            name: "Bob".into(),
+            name: "Bob",
             age: 30,
             country: None,
             home_city: None,

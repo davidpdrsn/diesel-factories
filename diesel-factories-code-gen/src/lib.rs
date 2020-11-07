@@ -24,7 +24,6 @@ use syn::{
     parse_macro_input,
     punctuated::Punctuated,
     GenericArgument, Ident, ItemStruct, Lifetime, Path, PathArguments, PathSegment, Token, Type,
-    TypePath,
 };
 
 #[proc_macro_derive(Factory, attributes(factory))]
@@ -107,13 +106,7 @@ impl Parse for Input {
                 .ident
                 .ok_or_else(|| syn::Error::new(field_span, "Unnamed fields are not supported"))?;
 
-            let type_span = field.ty.span();
-            let field_ty = match &field.ty {
-                Type::Path(ty) => ty.clone(),
-                _ => {
-                    return Err(syn::Error::new(type_span, "Expected type path"));
-                }
-            };
+            let field_ty = field.ty.clone();
 
             if let Ok(association_type) = AssociationType::new(field_ty) {
                 let foreign_key_name =
@@ -352,7 +345,12 @@ struct AssociationType {
 }
 
 impl AssociationType {
-    fn new(type_path: TypePath) -> syn::Result<Self> {
+    fn new(ty: Type) -> syn::Result<Self> {
+        let type_path = match ty {
+            Type::Path(ty) => ty,
+            _ => return Err(syn::Error::new(ty.span(), "Expected type path")),
+        };
+
         let whole_span = type_path.span();
 
         if type_path.qself.is_some() {
@@ -543,8 +541,8 @@ fn has_path_arguments(path_segment: &PathSegment) -> bool {
 
 impl Parse for AssociationType {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let type_path = input.parse::<TypePath>()?;
-        AssociationType::new(type_path)
+        let ty = input.parse::<Type>()?;
+        AssociationType::new(ty)
     }
 }
 
