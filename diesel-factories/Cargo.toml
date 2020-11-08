@@ -17,5 +17,5 @@ diesel = { version = "^1" }
 diesel-factories-code-gen = { version = "1.0.1", path = "../diesel-factories-code-gen" }
 
 [dev_dependencies]
-diesel = { version = "^1.3", features = ["postgres"] }
+diesel = { version = "^1.3", features = ["postgres", "network-address"] }
 trybuild = "1.0.3"
