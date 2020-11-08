@@ -6,7 +6,7 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-Code generation as been rewritten and should provide better error messages.
+Code generation has been rewritten and should provide better error messages.
 
 syn, quote, and proc-macro2 dependencies have been migrated to version 1.0.
 
