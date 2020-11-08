@@ -31,7 +31,7 @@ struct UserFactory<'a> {
 }
 ```
 
-Factories can now contain references ([#21](https://github.com/davidpdrsn/diesel-factories/issues/21)).
+Factories fields can now be more types including references and arrays ([#21](https://github.com/davidpdrsn/diesel-factories/issues/21)).
 
 ### Breaking changes
 
