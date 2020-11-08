@@ -5,6 +5,7 @@ extern crate diesel;
 
 use diesel::{pg::PgConnection, prelude::*};
 use diesel_factories::{Association, Factory};
+use std::env;
 
 mod schema {
     table! {
@@ -63,22 +64,22 @@ struct City {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "User",
-    table = "crate::schema::users",
-    connection = "diesel::pg::PgConnection"
+    model = User,
+    table = crate::schema::users,
+    connection = diesel::pg::PgConnection
 )]
-struct UserFactory<'b> {
-    pub name: String,
+struct UserFactory<'a> {
+    pub name: &'a str,
     pub age: i32,
-    pub country: std::option::Option<diesel_factories::Association<'b, Country, CountryFactory>>,
-    pub home_city: Option<diesel_factories::Association<'b, City, CityFactory<'b>>>,
-    pub current_city: Option<Association<'b, City, CityFactory<'b>>>,
+    pub country: std::option::Option<diesel_factories::Association<'a, Country, CountryFactory>>,
+    pub home_city: Option<diesel_factories::Association<'a, City, CityFactory<'a>>>,
+    pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
 }
 
-impl<'b> Default for UserFactory<'b> {
+impl<'a> Default for UserFactory<'a> {
     fn default() -> Self {
         Self {
-            name: "Bob".into(),
+            name: "Bob",
             age: 30,
             country: None,
             home_city: None,
@@ -89,9 +90,9 @@ impl<'b> Default for UserFactory<'b> {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "Country",
-    table = "crate::schema::countries",
-    id_name = "identity"
+    model = Country,
+    table = crate::schema::countries,
+    id_name = identity
 )]
 struct CountryFactory {
     pub name: String,
@@ -106,7 +107,7 @@ impl Default for CountryFactory {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "City", table = "crate::schema::cities")]
+#[factory(model = City, table = crate::schema::cities)]
 struct CityFactory<'b> {
     pub name: String,
     pub team_association: String,
@@ -166,7 +167,22 @@ fn insert_two_users_sharing_country() {
 }
 
 fn setup() -> PgConnection {
-    let database_url = "postgres://localhost/diesel_factories_test";
+    let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+    let pg_password = env::var("POSTGRES_PASSWORD").ok();
+
+    let auth = if let Some(pg_password) = pg_password {
+        format!("postgres:{}@", pg_password)
+    } else {
+        String::new()
+    };
+
+    let database_url = format!(
+        "postgres://{auth}{host}:{port}/diesel_factories_test",
+        auth = auth,
+        host = pg_host,
+        port = pg_port
+    );
     let con = PgConnection::establish(&database_url).unwrap();
     con.begin_test_transaction().unwrap();
     con

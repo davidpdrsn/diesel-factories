@@ -55,7 +55,7 @@ struct Country {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "Country", table = "crate::schema::countries")]
+#[factory(model = Country, table = crate::schema::countries)]
 struct CountryFactory {
     pub name: String,
 }
@@ -69,7 +69,7 @@ impl Default for CountryFactory {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "City", table = "crate::schema::cities")]
+#[factory(model = City, table = crate::schema::cities)]
 struct CityFactory<'a> {
     pub name: String,
     pub country: Association<'a, Country, CountryFactory>,

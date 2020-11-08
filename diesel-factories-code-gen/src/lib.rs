@@ -14,222 +14,226 @@
     unused_qualifications
 )]
 
-extern crate proc_macro;
-extern crate proc_macro2;
-
-use darling::FromDeriveInput;
-use proc_macro2::Span;
-use proc_macro2::TokenStream;
+use heck::CamelCase;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use quote::ToTokens;
-use syn::{parse_macro_input, DeriveInput};
-
-macro_rules! if_let_or_none {
-    ( $path:path , $($tokens:tt)* ) => {
-        if let $path(inner) = $($tokens)* {
-            inner
-        } else {
-            return None
-        }
-    };
-}
+use quote::{format_ident, ToTokens};
+use syn::spanned::Spanned;
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    punctuated::Punctuated,
+    GenericArgument, Ident, ItemStruct, Lifetime, Path, PathArguments, PathSegment, Token, Type,
+};
 
 #[proc_macro_derive(Factory, attributes(factory))]
 pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    let options = match Options::from_derive_input(&ast) {
-        Ok(options) => options,
-        Err(err) => panic!("{}", err),
-    };
-
-    let out = DeriveData::new(ast, options);
-    let tokens = out.build_derive_output();
-    tokens.into()
+    let input = parse_macro_input!(input as Input);
+    let tokens = quote! { #input };
+    proc_macro::TokenStream::from(tokens)
 }
 
-#[derive(FromDeriveInput, Debug)]
-#[darling(attributes(factory), forward_attrs(doc, cfg, allow))]
-struct Options {
-    model: syn::Path,
-    #[darling(default)]
-    connection: Option<syn::Path>,
-    #[darling(default)]
-    id: Option<syn::Ident>,
-    #[darling(default)]
-    id_name: Option<syn::Ident>,
-    table: syn::Path,
+mod struct_attr {
+    use bae::FromAttributes;
+    use syn::{Ident, Path, Type};
+
+    #[derive(Debug, FromAttributes)]
+    pub struct Factory {
+        pub model: Type,
+        pub table: Path,
+        pub connection: Option<Type>,
+        pub id: Option<Type>,
+        pub id_name: Option<Ident>,
+    }
 }
 
-struct DeriveData {
-    input: DeriveInput,
-    options: Options,
-    tokens: TokenStream,
+mod field_attr {
+    use bae::FromAttributes;
+    use syn::Ident;
+
+    #[derive(Debug, FromAttributes)]
+    pub struct Factory {
+        pub foreign_key_name: Ident,
+    }
 }
 
-trait TypeExtension {
-    fn to_string(&self) -> String;
-    fn extract_outermost_type(&self) -> &syn::PathSegment;
-    fn is_inside_option(&self) -> bool;
-    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment>;
-    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)>;
-    fn is_association_field(&self) -> bool;
-    fn parse_association_type(&self) -> Option<Association>;
-    fn normalize_lifetime_names(&self) -> TokenStream;
+#[derive(Debug)]
+struct Input {
+    model: Type,
+    table: Path,
+    connection: Type,
+    id_type: Type,
+    id_name: Ident,
+    factory_name: Ident,
+    fields: Vec<(Ident, Type)>,
+    associations: Vec<(Ident, AssociationType, Ident)>,
+    lifetime: Option<Lifetime>,
 }
 
-impl TypeExtension for syn::Type {
-    fn parse_association_type(&self) -> Option<Association> {
-        let is_option = self.is_inside_option();
+impl Parse for Input {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let ItemStruct {
+            attrs,
+            ident: factory_name,
+            generics,
+            fields: item_strut_fields,
 
-        let (model, factory) = if_let_or_none!(Some, self.extract_model_and_factory());
-        Some(Association {
-            is_option,
+            struct_token: _,
+            semi_token: _,
+            vis: _,
+        } = input.parse::<ItemStruct>()?;
+
+        let struct_attr::Factory {
             model,
-            factory,
+            table,
+            connection,
+            id,
+            id_name,
+        } = struct_attr::Factory::from_attributes(&attrs)?;
+
+        let connection =
+            connection.unwrap_or_else(|| syn::parse2(quote! { diesel::pg::PgConnection }).unwrap());
+        let id_type = id.unwrap_or_else(|| syn::parse2(quote! { i32 }).unwrap());
+        let id_name = id_name.unwrap_or_else(|| syn::parse2(quote! { id }).unwrap());
+
+        // parse fields and associations
+        let mut fields = Vec::new();
+        let mut associations = Vec::new();
+        for field in item_strut_fields {
+            let field_span = field.span();
+
+            let name = field
+                .ident
+                .ok_or_else(|| syn::Error::new(field_span, "Unnamed fields are not supported"))?;
+
+            let field_ty = field.ty.clone();
+
+            if let Ok(association_type) = AssociationType::new(field_ty) {
+                let foreign_key_name =
+                    if let Some(attr) = field_attr::Factory::try_from_attributes(&field.attrs)? {
+                        attr.foreign_key_name
+                    } else {
+                        format_ident!("{}_{}", name, id_name)
+                    };
+
+                associations.push((name, association_type, foreign_key_name));
+            } else {
+                if field_attr::Factory::from_attributes(&field.attrs).is_ok() {
+                    return Err(syn::Error::new(
+                        field_span,
+                        "`#[factory]` attributes are only allowed on association fields",
+                    ));
+                }
+
+                fields.push((name, field.ty));
+            }
+        }
+
+        // parse generic lifetime
+        let generics_span = generics.span();
+        let mut generics_iter = generics.params.into_iter();
+        let lifetime = match generics_iter.next() {
+            Some(inner) => match inner {
+                syn::GenericParam::Lifetime(lt_def) => {
+                    if !lt_def.bounds.is_empty() {
+                        return Err(syn::Error::new(lt_def.span(), "Unexpected lifetime bounds"));
+                    }
+
+                    Some(lt_def.lifetime)
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        generics_span,
+                        "Expected a single generic lifetime argument",
+                    ));
+                }
+            },
+            None => None,
+        };
+
+        if let Some(arg) = generics_iter.next() {
+            return Err(syn::Error::new(arg.span(), "Unexpected generic argument"));
+        }
+
+        Ok(Input {
+            model,
+            table,
+            connection,
+            id_type,
+            id_name,
+            factory_name,
+            fields,
+            associations,
+            lifetime,
         })
     }
+}
 
-    fn is_association_field(&self) -> bool {
-        match self.extract_outermost_non_optional() {
-            None => false,
-            Some(extracted) => extracted.ident.to_string() == "Association",
-        }
-    }
-
-    fn to_string(&self) -> String {
-        let mut tokenized = quote! {};
-        self.to_tokens(&mut tokenized);
-        tokenized.to_string()
-    }
-
-    fn extract_outermost_type(&self) -> &syn::PathSegment {
-        if let syn::Type::Path(syn::TypePath { qself: _, path }) = self {
-            let syn::Path {
-                leading_colon: _,
-                segments,
-            } = path;
-
-            &segments.last().unwrap().value()
-        } else {
-            panic!("Expected a TypePath here");
-        }
-    }
-
-    fn is_inside_option(&self) -> bool {
-        self.extract_outermost_type().ident.to_string() == "Option"
-    }
-
-    fn extract_outermost_non_optional(&self) -> Option<&syn::PathSegment> {
-        if !self.is_inside_option() {
-            return Some(self.extract_outermost_type());
-        } else {
-            let item = if_let_or_none!(
-                syn::PathArguments::AngleBracketed,
-                &self.extract_outermost_type().arguments
-            );
-            let unwrapped_type = if_let_or_none!(
-                syn::GenericArgument::Type,
-                &item.args.last().unwrap().value()
-            );
-            return Some(&unwrapped_type.extract_outermost_type());
-        }
-    }
-
-    fn normalize_lifetime_names(&self) -> TokenStream {
-        if let syn::Type::Path(syn::TypePath { qself: _, path }) = self {
-            let syn::Path {
-                leading_colon: _,
-                segments,
-            } = path;
-
-            let seg = segments.last().unwrap();
-            let seg_value = seg.value();
-            if let syn::PathArguments::AngleBracketed(_args) = &seg_value.arguments {
-                let ident = &seg_value.ident;
-                return quote! {
-                    #ident<'z>
-                };
-            } else {
-                return self.into_token_stream();
-            }
-        } else {
-            panic!("Expected a TypePath here");
-        }
-    }
-
-    fn extract_model_and_factory(&self) -> Option<(TokenStream, TokenStream)> {
-        let path_segment;
-        match self.extract_outermost_non_optional() {
-            None => return None,
-            Some(extracted) => path_segment = extracted,
-        }
-        let syn::PathSegment {
-            ident: _,
-            arguments,
-        } = path_segment;
-        let item = if_let_or_none!(syn::PathArguments::AngleBracketed, arguments);
-
-        let types_we_care_about: Vec<_> = item
-            .args
-            .iter()
-            .filter_map(|token| {
-                let extracted = if_let_or_none!(syn::GenericArgument::Type, token);
-                return Some(extracted);
-            })
-            .collect();
-        if types_we_care_about.len() != 2 {
-            return None;
-        }
-        let model_tokens = types_we_care_about
-            .first()
-            .unwrap()
-            .normalize_lifetime_names();
-        let factory_tokens = types_we_care_about
-            .last()
-            .unwrap()
-            .normalize_lifetime_names();
-        return Some((model_tokens, factory_tokens));
+impl ToTokens for Input {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(self.factory_trait_impl());
+        tokens.extend(self.field_builder_methods());
+        tokens.extend(self.association_builder_methods());
     }
 }
 
-impl DeriveData {
-    fn new(input: DeriveInput, options: Options) -> Self {
-        Self {
-            input,
-            options,
-            tokens: quote! {},
-        }
-    }
+impl Input {
+    fn factory_trait_impl(&self) -> TokenStream {
+        let factory = &self.factory_name;
+        let lifetime = &self.lifetime;
+        let model_type = &self.model;
+        let id_type = &self.id_type;
+        let connection_type = &self.connection;
+        let table_path = &self.table;
+        let id_name = &self.id_name;
 
-    fn build_derive_output(mut self) -> TokenStream {
-        self.gen_factory_methods_impl();
-        self.gen_builder_methods();
-        self.gen_set_association_traits();
+        let insert_code = if self.no_fields() {
+            quote! {
+                diesel::insert_into(#table_path::table)
+                    .default_values()
+                    .get_result::<Self::Model>(con)
+                    .expect("Insert of factory failed")
+            }
+        } else {
+            let values = self.fields.iter().map(|(name, _)| {
+                quote! { #table_path::#name.eq(&self.#name) }
+            });
+            let values = values.chain(self.associations.iter().map(
+                |(name, association_type, foreign_key_field)| {
+                    if association_type.is_optional {
+                        quote! {
+                            {
+                                let value = self.#name.map(|inner| {
+                                    inner.insert_returning_id(con)
+                                });
+                                #table_path::#foreign_key_field.eq(value)
+                            }
+                        }
+                    } else {
+                        quote! {
+                            #table_path::#foreign_key_field.eq(self.#name.insert_returning_id(con))
+                        }
+                    }
+                },
+            ));
 
-        self.tokens
-    }
+            quote! {
+                let values = ( #(#values),* );
+                diesel::insert_into(#table_path::table)
+                    .values(values)
+                    .get_result::<Self::Model>(con)
+                    .expect("Insert of factory failed")
+            }
+        };
 
-    fn gen_factory_methods_impl(&mut self) {
-        let factory = self.factory_name();
-        let generics = self.factory_generics();
-        let model_type = self.model_type();
-        let id_name = self.id_name();
-        let id_type = self.id_type();
-        let connection_type = self.connection_type();
-        let table_path = self.table_path();
-        let insert_code = self.insert_code();
-
-        let code = quote! {
-            impl#generics diesel_factories::Factory for #factory#generics {
+        quote! {
+            impl <#lifetime> diesel_factories::Factory for #factory <#lifetime> {
                 type Model = #model_type;
                 type Id = #id_type;
                 type Connection = #connection_type;
 
                 fn insert(self, con: &Self::Connection) -> Self::Model {
-                    use #table_path::dsl::*;
-                    use #table_path as table;
                     use diesel::prelude::*;
-
                     #insert_code
                 }
 
@@ -237,224 +241,60 @@ impl DeriveData {
                     &model.#id_name
                 }
             }
-        };
-        self.tokens.extend(code);
-    }
-
-    fn insert_code(&self) -> TokenStream {
-        let values = self.diesel_insert_values();
-
-        if self.no_fields() {
-            quote! {
-                diesel::insert_into(table::table)
-                    .default_values()
-                    .get_result::<Self::Model>(con)
-                    .unwrap()
-            }
-        } else {
-            quote! {
-                let values = ( #(#values),* );
-                diesel::insert_into(table::table)
-                    .values(values)
-                    .get_result::<Self::Model>(con)
-                    .unwrap()
-            }
-        }
-    }
-
-    fn gen_builder_methods(&mut self) {
-        let factory = self.factory_name();
-        let generics = self.factory_generics();
-        let methods = self.builder_methods();
-
-        let code = quote! {
-            impl#generics #factory#generics {
-                #(#methods)*
-            }
-        };
-        self.tokens.extend(code)
-    }
-
-    fn factory_name(&self) -> &syn::Ident {
-        &self.input.ident
-    }
-
-    fn model_type(&self) -> &syn::Path {
-        &self.options.model
-    }
-
-    fn id_type(&self) -> TokenStream {
-        self.options
-            .id
-            .as_ref()
-            .map(|inner| quote! { #inner })
-            .unwrap_or_else(|| quote! { i32 })
-    }
-
-    fn id_name(&self) -> TokenStream {
-        self.options
-            .id_name
-            .as_ref()
-            .map(|inner| quote! { #inner })
-            .unwrap_or(quote! { id })
-    }
-
-    fn connection_type(&self) -> TokenStream {
-        self.options
-            .connection
-            .as_ref()
-            .map(|inner| quote! { #inner })
-            .unwrap_or_else(|| quote! { diesel::pg::PgConnection })
-    }
-
-    fn table_path(&self) -> &syn::Path {
-        &self.options.table
-    }
-
-    fn factory_generics(&self) -> &syn::Generics {
-        &self.input.generics
-    }
-
-    fn struct_fields(&self) -> syn::punctuated::Iter<syn::Field> {
-        match &self.input.data {
-            syn::Data::Union(_) => panic!("Factory can only be derived on structs"),
-            syn::Data::Enum(_) => panic!("Factory can only be derived on structs"),
-            syn::Data::Struct(data) => match &data.fields {
-                syn::Fields::Named(named) => named.named.iter(),
-                syn::Fields::Unit => {
-                    panic!("Factory can only be derived on structs with named fields")
-                }
-                syn::Fields::Unnamed(_) => {
-                    panic!("Factory can only be derived on structs with named fields")
-                }
-            },
         }
     }
 
     fn no_fields(&self) -> bool {
-        self.struct_fields().count() == 0
+        self.fields.is_empty() && self.associations.is_empty()
     }
 
-    fn diesel_insert_values(&self) -> Vec<TokenStream> {
-        self.struct_fields()
-            .map(|field| self.diesel_insert_value(field))
-            .collect()
-    }
+    fn field_builder_methods(&self) -> TokenStream {
+        let factory_name = &self.factory_name;
 
-    fn diesel_insert_value(&self, field: &syn::Field) -> TokenStream {
-        let name = field
-            .ident
-            .as_ref()
-            .unwrap_or_else(|| panic!("Factory can only be derived for named fields"));
-
-        if let Some(association) = field.ty.parse_association_type() {
-            let foreign_key_field = ident(&format!("{}_id", name));
-            if association.is_option {
-                quote! {
-                    {
-                        let value = self.#name.map(|inner| {
-                            inner.insert_returning_id(con)
-                        });
-                        #foreign_key_field.eq(value)
-                    }
-                }
-            } else {
-                quote! {
-                    #foreign_key_field.eq(self.#name.insert_returning_id(con))
-                }
-            }
-        } else {
+        let methods = self.fields.iter().map(|(field_name, ty)| {
             quote! {
-                #name.eq(&self.#name)
-            }
-        }
-    }
-
-    fn builder_methods(&self) -> Vec<TokenStream> {
-        self.struct_fields()
-            .filter_map(|field| self.builder_method(field))
-            .collect()
-    }
-
-    fn builder_method(&self, field: &syn::Field) -> Option<TokenStream> {
-        let name = &field.ident;
-        let ty = &field.ty;
-
-        if field.ty.is_association_field() {
-            None
-        } else {
-            Some(quote! {
                 #[allow(missing_docs, dead_code)]
-                pub fn #name<T: Into<#ty>>(mut self, t: T) -> Self {
-                    self.#name = t.into();
+                pub fn #field_name(mut self, new: impl std::convert::Into<#ty>) -> Self {
+                    self.#field_name = new.into();
                     self
                 }
-            })
+            }
+        });
+
+        let lifetime = &self.lifetime;
+
+        quote! {
+            impl <#lifetime> #factory_name <#lifetime> {
+                #(#methods)*
+            }
         }
     }
 
-    fn gen_set_association_traits(&mut self) {
-        let association_traits = self.association_traits();
+    fn association_builder_methods(&self) -> TokenStream {
+        let factory_name = &self.factory_name;
 
-        self.tokens.extend(quote! {
-            #(#association_traits)*
-        });
-    }
+        self.associations.iter().map(|(field_name, association_type, _)| {
+            let association_name = format_ident!("{}", field_name.to_string().to_camel_case());
+            let trait_name = format_ident!("Set{}On{}", association_name, factory_name);
 
-    fn association_traits(&self) -> Vec<TokenStream> {
-        self.struct_fields()
-            .filter_map(|field| self.association_trait(field))
-            .collect()
-    }
+            let lifetime = &association_type.lifetime;
 
-    fn association_trait(&self, field: &syn::Field) -> Option<TokenStream> {
-        use heck::CamelCase;
+            let model_type = &association_type.model_type;
+            let other_factory = &association_type.factory_type;
 
-        if field.ty.is_association_field() {
-            let factory = self.factory_name();
-            let field_name = field.ident.as_ref().expect("field without name");
-            let camel_field_name = field_name.to_string().to_camel_case();
-
-            let association = field.ty.parse_association_type().unwrap_or_else(|| {
-                use std::fmt::Write;
-                let mut s = String::new();
-                writeln!(
-                    s,
-                    "Invalid association attribute. Must be on one of the following forms"
-                )
-                .unwrap();
-                writeln!(s).unwrap();
-                writeln!(s, "Association<'a, Model, Factory>").unwrap();
-                writeln!(s, "Option<Association<'a, Model, Factory>>").unwrap();
-                writeln!(s, "Association<'a, Model, Factory<'a>>").unwrap();
-                writeln!(s, "Option<Association<'a, Model, Factory<'a>>>").unwrap();
-                writeln!(s).unwrap();
-                writeln!(s, "Got\n{}", &field.ty.to_string()).unwrap();
-                panic!("{}", s);
-            });
-
-            let model = association.model;
-            let other_factory = association.factory;
-            let temp = other_factory.to_string();
-            let other_factory_without_lifetime = temp.split(" <").next().unwrap();
-            let trait_name = ident(&format!(
-                "Set{}On{}For{}",
-                other_factory_without_lifetime, factory, camel_field_name
-            ));
-
-            let model_impl = if association.is_option {
+            let model_impl = if association_type.is_optional {
                 quote! {
-                    impl<'z> #trait_name<Option<&'z #model>> for #factory<'z> {
-                        fn #field_name(mut self, t: Option<&'z #model>) -> Self {
-                            self.#field_name = t.map(|k| diesel_factories::Association::new_model(k));
+                    impl<#lifetime> #trait_name<std::option::Option<& #lifetime #model_type>> for #factory_name<#lifetime> {
+                        fn #field_name(mut self, t: std::option::Option<& #lifetime #model_type>) -> Self {
+                            self.#field_name = t.map(diesel_factories::Association::new_model);
                             self
                         }
                     }
                 }
             } else {
                 quote! {
-                    impl<'z> #trait_name<&'z #model> for #factory<'z> {
-                        fn #field_name(mut self, t: &'z #model) -> Self {
+                    impl<#lifetime> #trait_name<& #lifetime #model_type> for #factory_name<#lifetime> {
+                        fn #field_name(mut self, t: & #lifetime #model_type) -> Self {
                             self.#field_name = diesel_factories::Association::new_model(t);
                             self
                         }
@@ -462,18 +302,18 @@ impl DeriveData {
                 }
             };
 
-            let factory_impl = if association.is_option {
+            let factory_impl = if association_type.is_optional {
                 quote! {
-                    impl<'z> #trait_name<Option<#other_factory>> for #factory<'z> {
-                        fn #field_name(mut self, t: Option<#other_factory>) -> Self {
-                            self.#field_name = t.map(|k| diesel_factories::Association::new_factory(k));
+                    impl<#lifetime> #trait_name<std::option::Option<#other_factory>> for #factory_name<#lifetime> {
+                        fn #field_name(mut self, t: std::option::Option<#other_factory>) -> Self {
+                            self.#field_name = t.map(diesel_factories::Association::new_factory);
                             self
                         }
                     }
                 }
             } else {
                 quote! {
-                    impl<'z> #trait_name<#other_factory> for #factory<'z> {
+                    impl<#lifetime> #trait_name<#other_factory> for #factory_name<#lifetime> {
                         fn #field_name(mut self, t: #other_factory) -> Self {
                             self.#field_name = diesel_factories::Association::new_factory(t);
                             self
@@ -482,28 +322,325 @@ impl DeriveData {
                 }
             };
 
-            Some(quote! {
+            quote! {
                 #[allow(missing_docs, dead_code)]
                 pub trait #trait_name<T> {
                     fn #field_name(self, t: T) -> Self;
                 }
 
                 #model_impl
-
                 #factory_impl
-            })
-        } else {
-            None
-        }
+            }
+        }).collect()
     }
 }
 
-fn ident(s: &str) -> syn::Ident {
-    syn::Ident::new(s, Span::call_site())
+#[derive(Debug)]
+struct AssociationType {
+    span: Span,
+    lifetime: Lifetime,
+    model_type: Type,
+    factory_type: Type,
+    is_optional: bool,
 }
 
-struct Association {
-    is_option: bool,
-    model: TokenStream,
-    factory: TokenStream,
+impl AssociationType {
+    fn new(ty: Type) -> syn::Result<Self> {
+        let type_path = match ty {
+            Type::Path(ty) => ty,
+            _ => return Err(syn::Error::new(ty.span(), "Expected type path")),
+        };
+
+        let whole_span = type_path.span();
+
+        if type_path.qself.is_some() {
+            return Err(syn::Error::new(
+                type_path.span(),
+                "Qualified self types are not allowed here",
+            ));
+        }
+
+        let segments = type_path.path.segments;
+        let segments_span = segments.span();
+
+        let (segments, is_optional) = peel_option(segments);
+        let mut segments_iter = segments.into_iter().peekable();
+
+        // skip fully qualified path
+        let first = segments_iter
+            .peek()
+            .ok_or_else(|| syn::Error::new(segments_span, "Empty type path"))?;
+        if first.ident == "diesel_factories" {
+            segments_iter.next().ok_or_else(|| {
+                syn::Error::new(
+                    segments_span,
+                    "Expected something after `diesel_factories::`",
+                )
+            })?;
+        }
+
+        let path_segment = segments_iter
+            .next()
+            .ok_or_else(|| syn::Error::new(segments_span, "Type path too short"))?;
+        let arguments = if path_segment.ident == "Association" {
+            path_segment.arguments
+        } else {
+            return Err(syn::Error::new(
+                path_segment.span(),
+                format!(
+                    "Unexpected name `{}`. Expected `Association` or `diesel_factories::Association`",
+                    path_segment.ident,
+                )
+            ));
+        };
+
+        let arguments = match arguments {
+            syn::PathArguments::AngleBracketed(args) => args,
+            syn::PathArguments::Parenthesized(inner) => {
+                return Err(syn::Error::new(
+                    inner.span(),
+                    "Unexpected parenthesized type arguments. Expected angle bracketed arguments like `<...>`",
+                ));
+            }
+            syn::PathArguments::None => {
+                return Err(syn::Error::new(
+                    whole_span,
+                    "Missing association type arguments",
+                ));
+            }
+        };
+
+        if let Some(colon2) = &arguments.colon2_token {
+            return Err(syn::Error::new(colon2.span(), "Unexpected `::`"));
+        }
+
+        let args_span = arguments.span();
+        let mut args_iter = arguments.args.into_iter();
+
+        let lifetime = match args_iter.next() {
+            Some(inner) => match inner {
+                syn::GenericArgument::Lifetime(lt) => lt,
+                _ => {
+                    return Err(syn::Error::new(
+                        args_span,
+                        "Expected generic lifetime argument",
+                    ));
+                }
+            },
+            None => {
+                return Err(syn::Error::new(args_span, "Missing generic type arguments"));
+            }
+        };
+
+        let model_type = match args_iter.next() {
+            Some(inner) => match inner {
+                syn::GenericArgument::Type(ty) => ty,
+                _ => {
+                    return Err(syn::Error::new(args_span, "Expected generic type argument"));
+                }
+            },
+            None => {
+                return Err(syn::Error::new(args_span, "Missing generic type arguments"));
+            }
+        };
+
+        let factory_type = match args_iter.next() {
+            Some(inner) => match inner {
+                syn::GenericArgument::Type(ty) => ty,
+                _ => {
+                    return Err(syn::Error::new(args_span, "Expected generic type argument"));
+                }
+            },
+            None => {
+                return Err(syn::Error::new(args_span, "Missing generic type arguments"));
+            }
+        };
+
+        if let Some(next) = args_iter.next() {
+            return Err(syn::Error::new(next.span(), "Too many generic arguments"));
+        }
+
+        Ok(AssociationType {
+            span: whole_span,
+            lifetime,
+            model_type,
+            factory_type,
+            is_optional,
+        })
+    }
+}
+
+fn peel_option(
+    segments: Punctuated<PathSegment, Token![::]>,
+) -> (Punctuated<PathSegment, Token![::]>, bool) {
+    let original_segments = segments.clone();
+
+    let things_inside_option = (move || {
+        let mut iter = segments.into_iter();
+
+        let first_segment = iter.next()?;
+
+        let option_segment = if first_segment.ident == "std" && !has_path_arguments(&first_segment)
+        {
+            let option_module_segment = iter.next()?;
+            if option_module_segment.ident == "option"
+                || !has_path_arguments(&option_module_segment)
+            {
+                iter.next()?
+            } else {
+                return None;
+            }
+        } else if first_segment.ident == "Option" || has_path_arguments(&first_segment) {
+            first_segment
+        } else {
+            return None;
+        };
+
+        let args = match option_segment.arguments {
+            PathArguments::AngleBracketed(args) => args,
+            _ => return None,
+        };
+        if args.colon2_token.is_some() {
+            return None;
+        }
+        let mut args = args.args.into_iter();
+
+        let ty = match args.next()? {
+            GenericArgument::Type(ty) => ty,
+            _ => return None,
+        };
+        if args.next().is_some() {
+            return None;
+        }
+        let ty_path = match ty {
+            Type::Path(path) => path,
+            _ => return None,
+        };
+        if ty_path.qself.is_some() {
+            println!("whoop");
+            return None;
+        }
+
+        Some(ty_path.path.segments)
+    })();
+
+    if let Some(inner) = things_inside_option {
+        (inner, true)
+    } else {
+        (original_segments, false)
+    }
+}
+
+fn has_path_arguments(path_segment: &PathSegment) -> bool {
+    match &path_segment.arguments {
+        PathArguments::None => false,
+        PathArguments::AngleBracketed(_) => true,
+        PathArguments::Parenthesized(_) => true,
+    }
+}
+
+impl Parse for AssociationType {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let ty = input.parse::<Type>()?;
+        AssociationType::new(ty)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn is_association_type_true() {
+        let tokens = quote! { Association<'a, Country, CountryFactory> };
+        let ty = syn::parse2::<AssociationType>(tokens).unwrap();
+
+        assert_eq!(ty.lifetime.ident, "a");
+        assert_eq!(ty.model_type, syn::parse2(quote! { Country }).unwrap());
+        assert_eq!(
+            ty.factory_type,
+            syn::parse2(quote! { CountryFactory }).unwrap()
+        );
+        assert_eq!(ty.is_optional, false);
+    }
+
+    #[test]
+    fn is_association_type_true_qualified() {
+        let tokens = quote! { diesel_factories::Association<'b, Country, CountryFactory> };
+        let ty = syn::parse2::<AssociationType>(tokens).unwrap();
+
+        assert_eq!(ty.lifetime.ident, "b");
+        assert_eq!(ty.model_type, syn::parse2(quote! { Country }).unwrap());
+        assert_eq!(
+            ty.factory_type,
+            syn::parse2(quote! { CountryFactory }).unwrap()
+        );
+        assert_eq!(ty.is_optional, false);
+    }
+
+    #[test]
+    fn is_association_type_true_optional() {
+        let tokens = quote! { Option<Association<'a, Country, CountryFactory>> };
+        let ty = syn::parse2::<AssociationType>(tokens).unwrap();
+
+        assert_eq!(ty.lifetime.ident, "a");
+        assert_eq!(ty.model_type, syn::parse2(quote! { Country }).unwrap());
+        assert_eq!(
+            ty.factory_type,
+            syn::parse2(quote! { CountryFactory }).unwrap()
+        );
+        assert_eq!(ty.is_optional, true);
+    }
+
+    #[test]
+    fn is_association_type_true_qualified_optional() {
+        let tokens = quote! { Option<diesel_factories::Association<'b, Country, CountryFactory>> };
+        let ty = syn::parse2::<AssociationType>(tokens).unwrap();
+
+        assert_eq!(ty.lifetime.ident, "b");
+        assert_eq!(ty.model_type, syn::parse2(quote! { Country }).unwrap());
+        assert_eq!(
+            ty.factory_type,
+            syn::parse2(quote! { CountryFactory }).unwrap()
+        );
+        assert_eq!(ty.is_optional, true);
+    }
+
+    #[test]
+    fn is_association_type_true_qualified_optional_qualified_option_also() {
+        let tokens = quote! {
+            std::option::Option<diesel_factories::Association<'b, Country, CountryFactory>>
+        };
+        let ty = syn::parse2::<AssociationType>(tokens).unwrap();
+
+        assert_eq!(ty.lifetime.ident, "b");
+        assert_eq!(ty.model_type, syn::parse2(quote! { Country }).unwrap());
+        assert_eq!(
+            ty.factory_type,
+            syn::parse2(quote! { CountryFactory }).unwrap()
+        );
+        assert_eq!(ty.is_optional, true);
+    }
+
+    #[test]
+    fn is_association_type_false() {
+        let tokens = quote! { Country };
+        let ty = syn::parse2::<AssociationType>(tokens);
+        assert!(ty.is_err());
+    }
+
+    #[test]
+    fn is_association_type_too_few_of_generic_args() {
+        let tokens = quote! { Association<'a, Country> };
+        let ty = syn::parse2::<AssociationType>(tokens);
+        assert!(ty.is_err());
+    }
+
+    #[test]
+    fn is_association_type_too_many_generic_args() {
+        let tokens = quote! { Association<'a, Country, CountryFactory, i32> };
+        let ty = syn::parse2::<AssociationType>(tokens);
+        assert!(ty.is_err());
+    }
 }

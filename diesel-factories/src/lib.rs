@@ -41,13 +41,13 @@
 //! #[derive(Clone, Factory)]
 //! #[factory(
 //!     // model type our factory inserts
-//!     model = "City",
+//!     model = City,
 //!     // table the model belongs to
-//!     table = "crate::schema::cities",
+//!     table = crate::schema::cities,
 //!     // connection type you use. Defaults to `PgConnection`
-//!     connection = "diesel::pg::PgConnection",
+//!     connection = diesel::pg::PgConnection,
 //!     // type of primary key. Defaults to `i32`
-//!     id = "i32",
+//!     id = i32,
 //! )]
 //! struct CityFactory<'a> {
 //!     pub name: String,
@@ -79,11 +79,11 @@
 //!
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "Country",
-//!     table = "crate::schema::countries",
-//!     connection = "diesel::pg::PgConnection",
-//!     id = "i32",
-//!     id_name = "identity",
+//!     model = Country,
+//!     table = crate::schema::countries,
+//!     connection = diesel::pg::PgConnection,
+//!     id = i32,
+//!     id_name = identity,
 //! )]
 //! struct CountryFactory {
 //!     pub name: String,
@@ -156,7 +156,23 @@
 //! #     multiple_models_with_same_association();
 //! # }
 //! # fn establish_connection() -> PgConnection {
-//! #     let database_url = "postgres://localhost/diesel_factories_test";
+//! #     use std::env;
+//! #     let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+//! #     let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+//! #     let pg_password = env::var("POSTGRES_PASSWORD").ok();
+//! #
+//! #     let auth = if let Some(pg_password) = pg_password {
+//! #         format!("postgres:{}@", pg_password)
+//! #     } else {
+//! #         String::new()
+//! #     };
+//! #
+//! #     let database_url = format!(
+//! #         "postgres://{auth}{host}:{port}/diesel_factories_test",
+//! #         auth = auth,
+//! #         host = pg_host,
+//! #         port = pg_port
+//! #     );
 //! #     let con = PgConnection::establish(&database_url).unwrap();
 //! #     con.begin_test_transaction().unwrap();
 //! #     con
@@ -188,13 +204,21 @@
 //!
 //! ### Attributes
 //!
+//! These attributes are available on the struct itself inside `#[factory(...)]`.
+//!
 //! | Name | Description | Example | Default |
 //! |---|---|---|---|
-//! | `model` | Model type your factory inserts | `"City"` | None, required |
-//! | `table` | Table your model belongs to | `"crate::schema::cities"` | None, required |
-//! | `connection` | The connection type your app uses | `"MysqlConnection"` | `"diesel::pg::PgConnection"` |
-//! | `id` | The type of your table's primary key | `"i64"` | `"i32"` |
-//! | `id_name` | The name of your table's primary key column | `"identity"` | `"id"` |
+//! | `model` | Model type your factory inserts | `City` | None, required |
+//! | `table` | Table your model belongs to | `crate::schema::cities` | None, required |
+//! | `connection` | The connection type your app uses | `MysqlConnection` | `diesel::pg::PgConnection` |
+//! | `id` | The type of your table's primary key | `i64` | `i32` |
+//! | `id_name` | The name of your table's primary key column | `identity` | `id` |
+//!
+//! These attributes are available on association fields inside `#[factory(...)]`.
+//!
+//! | Name | Description | Example | Default |
+//! |---|---|---|---|
+//! | `foreign_key_name` | Name of the foreign key column on your model | `country_identity` | `{association_name}_id` |
 //!
 //! ### Builder methods
 //!
@@ -230,12 +254,13 @@
 //! The builder methods generated for `Association` fields are a bit different. If you have a factory like:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "City",
-//!     table = "crate::schema::cities",
+//!     model = City,
+//!     table = crate::schema::cities,
 //! )]
 //! struct CityFactory<'a> {
 //!     pub name: String,
@@ -254,12 +279,13 @@
 //! You'll be able to call `country` either with an owned `CountryFactory`:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! # #[derive(Clone, Factory)]
 //! # #[factory(
-//! #     model = "City",
-//! #     table = "crate::schema::cities",
+//! #     model = City,
+//! #     table = crate::schema::cities,
 //! # )]
 //! # struct CityFactory<'a> {
 //! #     pub name: String,
@@ -283,12 +309,13 @@
 //! Or a borrowed `Country`:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup.rs");
 //! #
 //! # #[derive(Clone, Factory)]
 //! # #[factory(
-//! #     model = "City",
-//! #     table = "crate::schema::cities",
+//! #     model = City,
+//! #     table = crate::schema::cities,
 //! # )]
 //! # struct CityFactory<'a> {
 //! #     pub name: String,
@@ -316,12 +343,13 @@
 //! If your model has a nullable association you can do this:
 //!
 //! ```
+//! # #![allow(unused_imports)]
 //! # include!("../tests/docs_setup_with_city_factory.rs");
 //! #
 //! #[derive(Clone, Factory)]
 //! #[factory(
-//!     model = "User",
-//!     table = "crate::schema::users",
+//!     model = User,
+//!     table = crate::schema::users,
 //! )]
 //! struct UserFactory<'a> {
 //!     pub name: String,
@@ -357,7 +385,34 @@
 //! UserFactory::default().country(Option::<&Country>::None);
 //! # }
 //! ```
-
+//!
+//! ### Customizing foreign key names
+//!
+//! You can customize the name of the foreign key for your associations like so
+//!
+//! ```
+//! # #![allow(unused_imports)]
+//! # include!("../tests/docs_setup.rs");
+//! #
+//! #[derive(Clone, Factory)]
+//! #[factory(
+//!     model = City,
+//!     table = crate::schema::cities,
+//! )]
+//! struct CityFactory<'a> {
+//!     #[factory(foreign_key_name = country_id)]
+//!     pub country: Association<'a, Country, CountryFactory>,
+//! #   pub name: String,
+//! }
+//! #
+//! # impl<'a> Default for CityFactory<'a> {
+//! #     fn default() -> Self {
+//! #         unimplemented!()
+//! #     }
+//! # }
+//! #
+//! # fn main() {}
+//! ```
 #![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.1")]
 #![deny(
     mutable_borrow_reservation_conflict,
@@ -437,7 +492,7 @@ where
 pub trait Factory: Clone {
     /// The model type the factory inserts.
     ///
-    /// For a factory named `UserFactory` this would probably be `Use`.
+    /// For a factory named `UserFactory` this would probably be `User`.
     type Model;
 
     /// The primary key type your model uses.
@@ -454,14 +509,14 @@ pub trait Factory: Clone {
     /// This will panic if the insert fails. Should be fine since you want panics early in tests.
     fn insert(self, con: &Self::Connection) -> Self::Model;
 
-    /// Get the primary id value for a model type.
+    /// Get the primary key value for a model type.
     ///
     /// Just a generic wrapper around `model.id`.
     fn id_for_model(model: &Self::Model) -> &Self::Id;
 }
 
 lazy_static! {
-    static ref SEQUENCE_COUNTER: AtomicUsize = { AtomicUsize::new(0) };
+    static ref SEQUENCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 }
 
 /// Utility function for generating unique ids or strings in factories.
@@ -493,5 +548,6 @@ mod test {
     fn test_compile_pass() {
         let t = trybuild::TestCases::new();
         t.pass("tests/compile_pass/*.rs");
+        t.compile_fail("tests/compile_fail/*.rs");
     }
 }

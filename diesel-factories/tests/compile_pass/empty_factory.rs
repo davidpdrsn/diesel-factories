@@ -1,4 +1,4 @@
-#![allow(proc_macro_derive_resolution_fallback)]
+#![allow(proc_macro_derive_resolution_fallback, unused_imports)]
 
 #[macro_use]
 extern crate diesel;
@@ -21,9 +21,9 @@ struct User {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "User",
-    table = "crate::schema::users",
-    connection = "diesel::pg::PgConnection"
+    model = User,
+    table = crate::schema::users,
+    connection = diesel::pg::PgConnection
 )]
 struct UserFactory {}
 

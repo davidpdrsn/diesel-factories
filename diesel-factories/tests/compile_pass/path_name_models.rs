@@ -1,4 +1,4 @@
-#![allow(proc_macro_derive_resolution_fallback)]
+#![allow(proc_macro_derive_resolution_fallback, unused_imports)]
 
 #[macro_use]
 extern crate diesel;
@@ -61,8 +61,8 @@ mod models {
 
 #[derive(Clone, Factory)]
 #[factory(
-    model = "crate::models::Country",
-    table = "crate::models::schema::countries"
+    model = crate::models::Country,
+    table = crate::models::schema::countries
 )]
 struct CountryFactory {
     pub name: String,
@@ -77,7 +77,7 @@ impl Default for CountryFactory {
 }
 
 #[derive(Clone, Factory)]
-#[factory(model = "crate::models::City", table = "crate::models::schema::cities")]
+#[factory(model = crate::models::City, table = crate::models::schema::cities)]
 struct CityFactory<'a> {
     pub name: String,
     pub country: Association<'a, crate::models::Country, CountryFactory>,
