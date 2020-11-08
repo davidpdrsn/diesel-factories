@@ -2,7 +2,7 @@
 
 An implementation of the test factory pattern made to work with [Diesel](https://diesel.rs).
 
-See [the documentation for more info](https://docs.rs/crate/diesel-factories).
+See [the documentation for more info](https://docs.rs/diesel-factories).
 
 ## Development
 
