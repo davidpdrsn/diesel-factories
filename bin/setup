@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+dropdb diesel_factories_test || true
+createdb diesel_factories_test || true
+
+cargo install diesel_cli --no-default-features --features postgres
+
+diesel migration run --database-url postgresql://localhost:5432/diesel_factories_test

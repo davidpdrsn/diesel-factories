@@ -6,24 +6,7 @@ See [the documentation for more info](https://docs.rs/diesel-factories).
 
 ## Development
 
-To install the `cargo fmt` pre-commit githook:
-
-```sh
-git config core.hooksPath ./githooks
-```
-
-To run tests, you will need to create a database:
-
-```sql
-CREATE DATABASE diesel_factories_test;
-```
-
-And also run migrations:
-
-```sh
-cargo install diesel_cli --no-default-features --features postgres
-diesel migration run database-url postgresql://localhost:5432/diesel_factories_test
-```
+Run `bin/setup` to create and migrate the test database. `cargo test` should then work.
 
 ---
 
