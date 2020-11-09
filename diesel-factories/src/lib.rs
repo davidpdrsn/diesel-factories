@@ -413,7 +413,7 @@
 //! #
 //! # fn main() {}
 //! ```
-#![doc(html_root_url = "https://docs.rs/diesel-factories/1.0.1")]
+#![doc(html_root_url = "https://docs.rs/diesel-factories/2.0.0")]
 #![deny(
     mutable_borrow_reservation_conflict,
     missing_docs,
