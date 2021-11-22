@@ -29,6 +29,13 @@ mod schema {
             country_id -> Integer,
         }
     }
+
+    table! {
+        visited_cities (user_id, city_id) {
+            user_id -> Integer,
+            city_id -> Integer,
+        }
+    }
 }
 
 #[derive(Queryable, Clone)]
@@ -52,6 +59,39 @@ struct City {
 struct Country {
     pub id: i32,
     pub name: String,
+}
+
+#[derive(Queryable, Clone)]
+struct VisitedCity {
+    pub user_id: i32,
+    pub city_id: i32,
+}
+
+
+#[derive(Clone, Factory)]
+#[factory(
+model = User,
+table = crate::schema::users,
+connection = diesel::pg::PgConnection
+)]
+struct UserFactory<'a> {
+    pub name: &'a str,
+    pub age: i32,
+    pub country: std::option::Option<diesel_factories::Association<'a, Country, CountryFactory>>,
+    pub home_city: Option<diesel_factories::Association<'a, City, CityFactory<'a>>>,
+    pub current_city: Option<Association<'a, City, CityFactory<'a>>>,
+}
+
+impl<'a> Default for UserFactory<'a> {
+    fn default() -> Self {
+        Self {
+            name: "Bob",
+            age: 30,
+            country: None,
+            home_city: None,
+            current_city: None,
+        }
+    }
 }
 
 #[derive(Clone, Factory)]
@@ -80,6 +120,22 @@ impl<'a> Default for CityFactory<'a> {
         Self {
             name: String::new(),
             country: Association::default(),
+        }
+    }
+}
+
+#[derive(Clone, Factory)]
+#[factory(model = VisitedCity, table = crate::schema::visited_cities, no_id)]
+struct VisitedCityFactory<'b> {
+    pub user: Association<'b, User, UserFactory<'b>>,
+    pub city: Association<'b, City, CityFactory<'b>>,
+}
+
+impl<'b> Default for VisitedCityFactory<'b> {
+    fn default() -> Self {
+        Self {
+            user: Association::default(),
+            city: Association::default(),
         }
     }
 }

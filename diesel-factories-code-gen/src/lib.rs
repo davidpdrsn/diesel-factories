@@ -44,6 +44,7 @@ mod struct_attr {
         pub connection: Option<Type>,
         pub id: Option<Type>,
         pub id_name: Option<Ident>,
+        pub no_id: Option<()>,
     }
 }
 
@@ -64,6 +65,7 @@ struct Input {
     connection: Type,
     id_type: Type,
     id_name: Ident,
+    no_id: Option<()>,
     factory_name: Ident,
     fields: Vec<(Ident, Type)>,
     associations: Vec<(Ident, AssociationType, Ident)>,
@@ -89,6 +91,7 @@ impl Parse for Input {
             connection,
             id,
             id_name,
+            no_id,
         } = struct_attr::Factory::from_attributes(&attrs)?;
 
         let connection =
@@ -161,6 +164,7 @@ impl Parse for Input {
             connection,
             id_type,
             id_name,
+            no_id,
             factory_name,
             fields,
             associations,
@@ -226,6 +230,20 @@ impl Input {
             }
         };
 
+        let id_for_model_method = if self.no_id.is_some() {
+            quote! {
+                fn id_for_model(model: &Self::Model) -> &Self::Id {
+                    &0
+                }
+            }
+        } else {
+            quote! {
+                fn id_for_model(model: &Self::Model) -> &Self::Id {
+                        &model.#id_name
+                }
+            }
+        };
+
         quote! {
             impl <#lifetime> diesel_factories::Factory for #factory <#lifetime> {
                 type Model = #model_type;
@@ -237,9 +255,7 @@ impl Input {
                     #insert_code
                 }
 
-                fn id_for_model(model: &Self::Model) -> &Self::Id {
-                    &model.#id_name
-                }
+                #id_for_model_method
             }
         }
     }

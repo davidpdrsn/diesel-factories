@@ -464,6 +464,22 @@ impl<'a, Model, Factory> Association<'a, Model, Factory> {
     pub fn new_factory(inner: Factory) -> Self {
         Association::Factory(inner)
     }
+
+    #[doc(hidden)]
+    pub fn model(&self) -> Option<&Model> {
+        match self {
+            Association::Model(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn factory(&self) -> Option<&Factory> {
+        match self {
+            Association::Factory(x) => Some(x),
+            _ => None,
+        }
+    }
 }
 
 impl<M, F> Association<'_, M, F>

@@ -6,7 +6,37 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-Nothing yet.
+Add support for tables with no primary key (e.g. a joined PK between columns)
+
+```rust
+mod schema {
+    table! {
+        users (id) {
+            id -> Integer,
+        }
+    }
+    
+    table! {
+        city(id) {
+            id -> Integer,
+        }
+    }
+    
+    table! {
+        visited_cities (user_id, city_id) {
+            user_id -> Int4,
+            city_id -> Int4,
+        }
+    }
+}
+
+#[derive(Clone, Factory)]
+#[factory(model = VisitedCity, table = crate::schema::visited_cities, no_id)]
+struct VisitedCityFactory<'a> {
+    pub user: Association<'a, User, UserFactory>,
+    pub city: Association<'a, City, CityFactory>,
+}
+```
 
 ## 2.0.0
 
