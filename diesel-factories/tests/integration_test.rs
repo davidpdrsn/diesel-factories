@@ -35,6 +35,13 @@ mod schema {
             country_id -> Integer,
         }
     }
+
+    table! {
+        visited_cities (user_id, city_id) {
+            user_id -> Integer,
+            city_id -> Integer,
+        }
+    }
 }
 
 #[derive(Queryable, Clone)]
@@ -60,6 +67,12 @@ struct City {
     pub team_association: String,
     pub association_label: String,
     pub country_id: i32,
+}
+
+#[derive(Queryable, Clone)]
+struct VisitedCity {
+    pub user_id: i32,
+    pub city_id: i32,
 }
 
 #[derive(Clone, Factory)]
@@ -126,6 +139,22 @@ impl<'b> Default for CityFactory<'b> {
     }
 }
 
+#[derive(Clone, Factory)]
+#[factory(model = VisitedCity, table = crate::schema::visited_cities, no_id)]
+struct VisitedCityFactory<'b> {
+    pub user: Association<'b, User, UserFactory<'b>>,
+    pub city: Association<'b, City, CityFactory<'b>>,
+}
+
+impl<'b> Default for VisitedCityFactory<'b> {
+    fn default() -> Self {
+        Self {
+            user: Association::default(),
+            city: Association::default(),
+        }
+    }
+}
+
 #[test]
 fn insert_one_user() {
     let con = setup();
@@ -166,6 +195,41 @@ fn insert_two_users_sharing_country() {
     assert_eq!(1, count_countries(&con));
 }
 
+#[test]
+fn insert_visited_cities() {
+    let con = setup();
+
+    let country = CountryFactory::default().insert(&con);
+    let user = UserFactory::default().country(Some(&country)).insert(&con);
+    let city_one = CityFactory::default().country(&country).insert(&con);
+    let city_two = CityFactory::default().country(&country).insert(&con);
+
+    let visited_city_one = VisitedCityFactory::default().city(&city_one).user(&user).insert(&con);
+    let visited_city_two = VisitedCityFactory::default().city(&city_two).user(&user).insert(&con);
+
+    assert_eq!(user.country_id, Some(country.identity));
+    assert_eq!(1, count_users(&con));
+    assert_eq!(1, count_countries(&con));
+    assert_eq!(2, count_cities(&con));
+    assert_eq!(2, count_visited_cities(&con));
+    assert_eq!(visited_city_one.user_id, user.id);
+    assert_eq!(visited_city_one.city_id, city_one.id);
+    assert_eq!(visited_city_two.user_id, user.id);
+    assert_eq!(visited_city_two.city_id, city_two.id);
+}
+
+#[test]
+fn visited_cities_build_whole_tree() {
+    let con = setup();
+
+    VisitedCityFactory::default().insert(&con);
+
+    assert_eq!(1, count_users(&con));
+    assert_eq!(1, count_countries(&con));
+    assert_eq!(1, count_cities(&con));
+    assert_eq!(1, count_visited_cities(&con));
+}
+
 fn setup() -> PgConnection {
     let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
     let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
@@ -198,6 +262,18 @@ fn count_countries(con: &PgConnection) -> i64 {
     use crate::schema::countries;
     use diesel::dsl::count_star;
     countries::table.select(count_star()).first(con).unwrap()
+}
+
+fn count_cities(con: &PgConnection) -> i64 {
+    use crate::schema::cities;
+    use diesel::dsl::count_star;
+    cities::table.select(count_star()).first(con).unwrap()
+}
+
+fn count_visited_cities(con: &PgConnection) -> i64 {
+    use crate::schema::visited_cities;
+    use diesel::dsl::count_star;
+    visited_cities::table.select(count_star()).first(con).unwrap()
 }
 
 fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
