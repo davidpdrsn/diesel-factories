@@ -6,7 +6,7 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-Nothing yet.
+- update heck dependency to 0.4
 
 ## 2.0.0
 

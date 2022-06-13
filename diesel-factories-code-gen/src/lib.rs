@@ -14,7 +14,7 @@
     unused_qualifications
 )]
 
-use heck::CamelCase;
+use heck::ToUpperCamelCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote::{format_ident, ToTokens};
@@ -274,7 +274,7 @@ impl Input {
         let factory_name = &self.factory_name;
 
         self.associations.iter().map(|(field_name, association_type, _)| {
-            let association_name = format_ident!("{}", field_name.to_string().to_camel_case());
+            let association_name = format_ident!("{}", field_name.to_string().to_upper_camel_case());
             let trait_name = format_ident!("Set{}On{}", association_name, factory_name);
 
             let lifetime = &association_type.lifetime;
