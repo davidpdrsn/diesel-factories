@@ -15,7 +15,7 @@ version = "2.0.0"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "1", features = ["full"] }
-heck = "0.3"
+heck = "0.4"
 bae = "0.1"
 
 [lib]
