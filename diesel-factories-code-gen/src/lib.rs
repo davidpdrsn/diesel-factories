@@ -47,6 +47,16 @@ mod struct_attr {
     }
 }
 
+mod assoc_field_attr {
+    use bae::FromAttributes;
+    use syn::Ident;
+
+    #[derive(Debug, FromAttributes)]
+    pub struct Factory {
+        pub foreign_key_name: Ident,
+    }
+}
+
 mod field_attr {
     use bae::FromAttributes;
     use syn::Ident;
@@ -110,7 +120,7 @@ impl Parse for Input {
 
             if let Ok(association_type) = AssociationType::new(field_ty) {
                 let foreign_key_name =
-                    if let Some(attr) = field_attr::Factory::try_from_attributes(&field.attrs)? {
+                    if let Some(attr) = assoc_field_attr::Factory::try_from_attributes(&field.attrs)? {
                         attr.foreign_key_name
                     } else {
                         format_ident!("{}_{}", name, id_name)
@@ -118,7 +128,7 @@ impl Parse for Input {
 
                 associations.push((name, association_type, foreign_key_name));
             } else {
-                if field_attr::Factory::from_attributes(&field.attrs).is_ok() {
+                if assoc_field_attr::Factory::from_attributes(&field.attrs).is_ok() {
                     return Err(syn::Error::new(
                         field_span,
                         "`#[factory]` attributes are only allowed on association fields",
@@ -187,6 +197,9 @@ impl Input {
         let table_path = &self.table;
         let id_name = &self.id_name;
 
+        let ident_type : Ident = syn::parse_str("r#type").unwrap();
+        let ident_type_ : Ident = syn::parse_str("type_").unwrap();
+
         let insert_code = if self.no_fields() {
             quote! {
                 diesel::insert_into(#table_path::table)
@@ -196,7 +209,12 @@ impl Input {
             }
         } else {
             let values = self.fields.iter().map(|(name, _)| {
-                quote! { #table_path::#name.eq(&self.#name) }
+                let field_name = if name == &ident_type {
+                    &ident_type_
+                } else {
+                    name
+                };
+                quote! { #table_path::#field_name.eq(&self.#name) }
             });
             let values = values.chain(self.associations.iter().map(
                 |(name, association_type, foreign_key_field)| {
