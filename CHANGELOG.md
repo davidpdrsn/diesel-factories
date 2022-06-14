@@ -6,7 +6,7 @@ for Rust libraries in [RFC #1105](https://github.com/rust-lang/rfcs/blob/master/
 
 ## Unreleased
 
-Nothing yet.
+- quick fix to handle DB columns of name "type" (which diesel names as type_)
 
 ## 2.0.0
 
