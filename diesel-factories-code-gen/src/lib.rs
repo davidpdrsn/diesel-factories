@@ -1,9 +1,7 @@
 //! See the docs for "diesel-factories" for more info about this.
 
-#![deny(mutable_borrow_reservation_conflict)]
 #![recursion_limit = "128"]
 #![deny(
-    mutable_borrow_reservation_conflict,
     missing_debug_implementations,
     missing_copy_implementations,
     trivial_casts,
@@ -16,8 +14,7 @@
 
 use heck::CamelCase;
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
-use quote::{format_ident, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use syn::spanned::Spanned;
 use syn::{
     parse::{Parse, ParseStream},
@@ -562,7 +559,7 @@ mod test {
             ty.factory_type,
             syn::parse2(quote! { CountryFactory }).unwrap()
         );
-        assert_eq!(ty.is_optional, false);
+        assert!(!ty.is_optional);
     }
 
     #[test]
@@ -576,7 +573,7 @@ mod test {
             ty.factory_type,
             syn::parse2(quote! { CountryFactory }).unwrap()
         );
-        assert_eq!(ty.is_optional, false);
+        assert!(!ty.is_optional);
     }
 
     #[test]
@@ -590,7 +587,7 @@ mod test {
             ty.factory_type,
             syn::parse2(quote! { CountryFactory }).unwrap()
         );
-        assert_eq!(ty.is_optional, true);
+        assert!(ty.is_optional);
     }
 
     #[test]
@@ -604,7 +601,7 @@ mod test {
             ty.factory_type,
             syn::parse2(quote! { CountryFactory }).unwrap()
         );
-        assert_eq!(ty.is_optional, true);
+        assert!(ty.is_optional);
     }
 
     #[test]
@@ -620,7 +617,7 @@ mod test {
             ty.factory_type,
             syn::parse2(quote! { CountryFactory }).unwrap()
         );
-        assert_eq!(ty.is_optional, true);
+        assert!(ty.is_optional);
     }
 
     #[test]
