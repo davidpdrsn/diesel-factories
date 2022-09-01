@@ -13,9 +13,9 @@ repository = "https://github.com/davidpdrsn/diesel-factories.git"
 version = "2.0.0"
 
 [dependencies]
-diesel = { version = "^1" }
+diesel = { version = "2" }
 diesel-factories-code-gen = { version = "2.0.0", path = "../diesel-factories-code-gen" }
 
 [dev_dependencies]
-diesel = { version = "^1.3", features = ["postgres", "network-address"] }
+diesel = { version = "2", features = ["postgres", "network-address"] }
 trybuild = "1.0.3"

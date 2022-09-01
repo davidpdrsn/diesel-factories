@@ -4,7 +4,7 @@ error: `#[factory]` attributes are only allowed on association fields
 39 |     #[factory(foreign_key_name = not_allowed_here)]
    |     ^
 
-error[E0599]: no method named `country` found for struct `UserFactory<'_>` in the current scope
+error[E0599]: no method named `country` found for struct `UserFactory` in the current scope
   --> $DIR/foreign_key_name_on_non_association.rs:75:10
    |
 38 | struct UserFactory<'a> {
