@@ -160,9 +160,9 @@
 //! #     let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
 //! #     let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
 //! #     let pg_password = env::var("POSTGRES_PASSWORD").ok();
-//! #
+//! #     let pg_user = env::var("POSTGRES_USER").unwrap_or_else(|_| "test".to_string());
 //! #     let auth = if let Some(pg_password) = pg_password {
-//! #         format!("postgres:{}@", pg_password)
+//! #         format!("{}:{}@", pg_user, pg_password)
 //! #     } else {
 //! #         String::new()
 //! #     };
