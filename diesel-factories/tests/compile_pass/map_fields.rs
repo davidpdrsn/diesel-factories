@@ -11,6 +11,7 @@ mod schema {
         users (identity) {
             identity -> Integer,
             name -> Text,
+            age -> Integer,
             last_name -> Text,
             created_at -> Nullable<Timestamp>
         }
@@ -24,6 +25,7 @@ mod schema {
 struct User {
     pub identity: i32,
     pub name: String,
+    pub age: i32,
     pub last_name: String
 }
 
@@ -51,7 +53,4 @@ impl Default for UserFactory {
     }
 }
 
-fn main() {
-    let f = UserFactory::default();
-    let d = f.name(format!("hello worrld"));
-}
+fn main() {}

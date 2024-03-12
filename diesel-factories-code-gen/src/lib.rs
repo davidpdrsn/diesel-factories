@@ -268,17 +268,15 @@ impl Input {
         let connection_type = &self.connection;
         let table_path = &self.table;
         let id_name = &self.id_name;
-        
         let insert_code = if self.no_fields() {
 
             match self.map_fields  {
                 Some(_) => {
-                    let fields = self.fields.iter().map(|(name, _)| name);
                     
                     quote! {                    
                         diesel::insert_into(#table_path::table)
                         .default_values()
-                        .returning((#(#table_path::#fields),*))
+                        .returning(Self::Model::get_model_fields())
                         .get_result::<Self::Model>(con)
                         .expect("Insert of factory failed")
                     }
@@ -315,14 +313,11 @@ impl Input {
             
             match self.map_fields  {
                 Some(_) => {
-                    let fields = self.fields.iter().map(|(name, _)| name);
-
                     quote! {
                         let values = ( #(#values),* );
-                    
                         diesel::insert_into(#table_path::table)
                         .values(values)
-                        .returning((#(#table_path::#fields),*))
+                        .returning(Self::Model::get_model_fields())
                         .get_result::<Self::Model>(con)
                         .expect("Insert of factory failed")
                     }
