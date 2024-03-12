@@ -19,6 +19,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use quote::{format_ident, ToTokens};
 use syn::spanned::Spanned;
+
+
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
@@ -33,6 +35,78 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     proc_macro::TokenStream::from(tokens)
 }
 
+struct MapInput {
+    ident: Ident,
+    model: Type,
+    fields: Vec<Ident>,
+}
+
+impl Parse for MapInput {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let ItemStruct {
+            attrs,
+            ident,
+            generics: _,
+            fields: item_strut_fields,
+            struct_token: _,
+            semi_token: _,
+            vis: _,
+        } = input.parse::<ItemStruct>()?;
+
+        let mut fields: Vec<Ident> = Vec::new();
+
+        let struct_attr::MapModel {
+            model,
+        } = struct_attr::MapModel::from_attributes(&attrs)?;
+
+        for field in item_strut_fields {
+            let field_span = field.span();
+
+            let name = field
+                .ident
+                .ok_or_else(|| syn::Error::new(field_span, "Unnamed fields are not supported"))?;
+
+            fields.push(name);
+        }
+
+        Ok(MapInput {
+            fields,
+            ident,
+            model,
+        })
+    }
+}
+
+impl ToTokens for MapInput {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(self.factory_trait_impl());
+    }
+}
+
+impl MapInput {
+    fn factory_trait_impl(&self) -> TokenStream {
+        let ident = &self.ident;
+        let fields = &self.fields;
+        let model = &self.model;
+
+        quote! {
+            impl #ident {
+                fn get_model_fields() -> (#(#model::#fields),*) {
+                    (#(#model::#fields),*)
+                }
+            };
+        }
+    }
+}
+
+#[proc_macro_derive(MapModel, attributes(map_model))]
+pub fn derive_map_model(input: proc_macro::TokenStream) ->  proc_macro::TokenStream { 
+    let input = parse_macro_input!(input as MapInput);
+    let tokens = quote! { #input };
+    proc_macro::TokenStream::from(tokens)
+}
+
+
 mod struct_attr {
     use bae::FromAttributes;
     use syn::{Ident, Path, Type};
@@ -41,9 +115,15 @@ mod struct_attr {
     pub struct Factory {
         pub model: Type,
         pub table: Path,
+        pub map_fields: Option<()>,
         pub connection: Option<Type>,
         pub id: Option<Type>,
         pub id_name: Option<Ident>,
+    }
+
+    #[derive(Debug, FromAttributes)]
+    pub struct MapModel {
+        pub model: Type,
     }
 }
 
@@ -65,6 +145,7 @@ struct Input {
     id_type: Type,
     id_name: Ident,
     factory_name: Ident,
+    map_fields: Option<()>,
     fields: Vec<(Ident, Type)>,
     associations: Vec<(Ident, AssociationType, Ident)>,
     lifetime: Option<Lifetime>,
@@ -77,7 +158,6 @@ impl Parse for Input {
             ident: factory_name,
             generics,
             fields: item_strut_fields,
-
             struct_token: _,
             semi_token: _,
             vis: _,
@@ -89,6 +169,7 @@ impl Parse for Input {
             connection,
             id,
             id_name,
+            map_fields,
         } = struct_attr::Factory::from_attributes(&attrs)?;
 
         let connection =
@@ -165,6 +246,7 @@ impl Parse for Input {
             fields,
             associations,
             lifetime,
+            map_fields
         })
     }
 }
@@ -186,13 +268,27 @@ impl Input {
         let connection_type = &self.connection;
         let table_path = &self.table;
         let id_name = &self.id_name;
-
+        
         let insert_code = if self.no_fields() {
-            quote! {
-                diesel::insert_into(#table_path::table)
+
+            match self.map_fields  {
+                Some(_) => {
+                    let fields = self.fields.iter().map(|(name, _)| name);
+                    
+                    quote! {                    
+                        diesel::insert_into(#table_path::table)
+                        .default_values()
+                        .returning((#(#table_path::#fields),*))
+                        .get_result::<Self::Model>(con)
+                        .expect("Insert of factory failed")
+                    }
+                },
+                _ => quote! {
+                    diesel::insert_into(#table_path::table)
                     .default_values()
                     .get_result::<Self::Model>(con)
                     .expect("Insert of factory failed")
+                }
             }
         } else {
             let values = self.fields.iter().map(|(name, _)| {
@@ -216,13 +312,29 @@ impl Input {
                     }
                 },
             ));
+            
+            match self.map_fields  {
+                Some(_) => {
+                    let fields = self.fields.iter().map(|(name, _)| name);
 
-            quote! {
-                let values = ( #(#values),* );
-                diesel::insert_into(#table_path::table)
+                    quote! {
+                        let values = ( #(#values),* );
+                    
+                        diesel::insert_into(#table_path::table)
+                        .values(values)
+                        .returning((#(#table_path::#fields),*))
+                        .get_result::<Self::Model>(con)
+                        .expect("Insert of factory failed")
+                    }
+                },
+                _ => quote! {
+                    let values = ( #(#values),* );
+
+                    diesel::insert_into(#table_path::table)
                     .values(values)
                     .get_result::<Self::Model>(con)
                     .expect("Insert of factory failed")
+                }
             }
         };
 
