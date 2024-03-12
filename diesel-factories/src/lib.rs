@@ -429,7 +429,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub use diesel_factories_code_gen::{ Factory, MapModel };
+pub use diesel_factories_code_gen::{Factory, MapModel};
 
 /// A "belongs to" association that may or may not have been inserted yet.
 ///
@@ -481,7 +481,6 @@ where
         }
     }
 }
-
 
 /// A generic factory trait.
 ///

@@ -20,7 +20,6 @@ use quote::quote;
 use quote::{format_ident, ToTokens};
 use syn::spanned::Spanned;
 
-
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
@@ -55,9 +54,7 @@ impl Parse for MapInput {
 
         let mut fields: Vec<Ident> = Vec::new();
 
-        let struct_attr::MapModel {
-            model,
-        } = struct_attr::MapModel::from_attributes(&attrs)?;
+        let struct_attr::MapModel { model } = struct_attr::MapModel::from_attributes(&attrs)?;
 
         for field in item_strut_fields {
             let field_span = field.span();
@@ -100,12 +97,11 @@ impl MapInput {
 }
 
 #[proc_macro_derive(MapModel, attributes(map_model))]
-pub fn derive_map_model(input: proc_macro::TokenStream) ->  proc_macro::TokenStream { 
+pub fn derive_map_model(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as MapInput);
     let tokens = quote! { #input };
     proc_macro::TokenStream::from(tokens)
 }
-
 
 mod struct_attr {
     use bae::FromAttributes;
@@ -246,7 +242,7 @@ impl Parse for Input {
             fields,
             associations,
             lifetime,
-            map_fields
+            map_fields,
         })
     }
 }
@@ -269,24 +265,22 @@ impl Input {
         let table_path = &self.table;
         let id_name = &self.id_name;
         let insert_code = if self.no_fields() {
-
-            match self.map_fields  {
+            match self.map_fields {
                 Some(_) => {
-                    
-                    quote! {                    
+                    quote! {
                         diesel::insert_into(#table_path::table)
                         .default_values()
                         .returning(Self::Model::get_model_fields())
                         .get_result::<Self::Model>(con)
                         .expect("Insert of factory failed")
                     }
-                },
+                }
                 _ => quote! {
                     diesel::insert_into(#table_path::table)
                     .default_values()
                     .get_result::<Self::Model>(con)
                     .expect("Insert of factory failed")
-                }
+                },
             }
         } else {
             let values = self.fields.iter().map(|(name, _)| {
@@ -310,8 +304,8 @@ impl Input {
                     }
                 },
             ));
-            
-            match self.map_fields  {
+
+            match self.map_fields {
                 Some(_) => {
                     quote! {
                         let values = ( #(#values),* );
@@ -321,7 +315,7 @@ impl Input {
                         .get_result::<Self::Model>(con)
                         .expect("Insert of factory failed")
                     }
-                },
+                }
                 _ => quote! {
                     let values = ( #(#values),* );
 
@@ -329,7 +323,7 @@ impl Input {
                     .values(values)
                     .get_result::<Self::Model>(con)
                     .expect("Insert of factory failed")
-                }
+                },
             }
         };
 
