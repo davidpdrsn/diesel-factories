@@ -99,55 +99,55 @@
 //!
 //! // Usage
 //! fn basic_usage() {
-//!     let con = establish_connection();
+//!     let mut con = establish_connection();
 //!
-//!     let city = CityFactory::default().insert(&con);
+//!     let city = CityFactory::default().insert(&mut con);
 //!     assert_eq!("Copenhagen", city.name);
 //!
-//!     let country = find_country_by_id(city.country_id, &con);
+//!     let country = find_country_by_id(city.country_id, &mut con);
 //!     assert_eq!("Denmark", country.name);
 //!
-//!     assert_eq!(1, count_cities(&con));
-//!     assert_eq!(1, count_countries(&con));
+//!     assert_eq!(1, count_cities(&mut con));
+//!     assert_eq!(1, count_countries(&mut con));
 //! }
 //!
 //! fn setting_fields() {
-//!     let con = establish_connection();
+//!     let mut con = establish_connection();
 //!
 //!     let city = CityFactory::default()
 //!         .name("Amsterdam")
 //!         .country(CountryFactory::default().name("Netherlands"))
-//!         .insert(&con);
+//!         .insert(&mut con);
 //!     assert_eq!("Amsterdam", city.name);
 //!
-//!     let country = find_country_by_id(city.country_id, &con);
+//!     let country = find_country_by_id(city.country_id, &mut con);
 //!     assert_eq!("Netherlands", country.name);
 //!
-//!     assert_eq!(1, count_cities(&con));
-//!     assert_eq!(1, count_countries(&con));
+//!     assert_eq!(1, count_cities(&mut con));
+//!     assert_eq!(1, count_countries(&mut con));
 //! }
 //!
 //! fn multiple_models_with_same_association() {
-//!     let con = establish_connection();
+//!     let mut con = establish_connection();
 //!
 //!     let netherlands = CountryFactory::default()
 //!         .name("Netherlands")
-//!         .insert(&con);
+//!         .insert(&mut con);
 //!
 //!     let amsterdam = CityFactory::default()
 //!         .name("Amsterdam")
 //!         .country(&netherlands)
-//!         .insert(&con);
+//!         .insert(&mut con);
 //!
 //!     let hague = CityFactory::default()
 //!         .name("The Hague")
 //!         .country(&netherlands)
-//!         .insert(&con);
+//!         .insert(&mut con);
 //!
 //!     assert_eq!(amsterdam.country_id, hague.country_id);
 //!
-//!     assert_eq!(2, count_cities(&con));
-//!     assert_eq!(1, count_countries(&con));
+//!     assert_eq!(2, count_cities(&mut con));
+//!     assert_eq!(1, count_countries(&mut con));
 //! }
 //! #
 //! # fn main() {
@@ -160,9 +160,9 @@
 //! #     let pg_host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
 //! #     let pg_port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
 //! #     let pg_password = env::var("POSTGRES_PASSWORD").ok();
-//! #
+//! #     let pg_user = env::var("POSTGRES_USER").unwrap_or_else(|_| "test".to_string());
 //! #     let auth = if let Some(pg_password) = pg_password {
-//! #         format!("postgres:{}@", pg_password)
+//! #         format!("{}:{}@", pg_user, pg_password)
 //! #     } else {
 //! #         String::new()
 //! #     };
@@ -173,25 +173,25 @@
 //! #         host = pg_host,
 //! #         port = pg_port
 //! #     );
-//! #     let con = PgConnection::establish(&database_url).unwrap();
+//! #     let mut con = PgConnection::establish(&database_url).unwrap();
 //! #     con.begin_test_transaction().unwrap();
 //! #     con
 //! # }
 //!
 //! // Utility functions just for demo'ing
-//! fn count_cities(con: &PgConnection) -> i64 {
+//! fn count_cities(con: &mut PgConnection) -> i64 {
 //!     use crate::schema::cities;
 //!     use diesel::dsl::count_star;
 //!     cities::table.select(count_star()).first(con).unwrap()
 //! }
 //!
-//! fn count_countries(con: &PgConnection) -> i64 {
+//! fn count_countries(con: &mut PgConnection) -> i64 {
 //!     use crate::schema::countries;
 //!     use diesel::dsl::count_star;
 //!     countries::table.select(count_star()).first(con).unwrap()
 //! }
 //!
-//! fn find_country_by_id(input: i32, con: &PgConnection) -> Country {
+//! fn find_country_by_id(input: i32, con: &mut PgConnection) -> Country {
 //!     use crate::schema::countries::dsl::*;
 //!     countries
 //!         .filter(identity.eq(&input))
@@ -429,7 +429,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub use diesel_factories_code_gen::Factory;
+pub use diesel_factories_code_gen::{Factory, MapModel};
 
 /// A "belongs to" association that may or may not have been inserted yet.
 ///
@@ -471,7 +471,7 @@ where
     F: Factory<Model = M> + Clone,
 {
     #[doc(hidden)]
-    pub fn insert_returning_id(&self, con: &F::Connection) -> F::Id {
+    pub fn insert_returning_id(&self, con: &mut F::Connection) -> F::Id {
         match self {
             Association::Model(model) => F::id_for_model(&model).clone(),
             Association::Factory(factory) => {
@@ -506,7 +506,7 @@ pub trait Factory: Clone {
     ///
     /// # Panics
     /// This will panic if the insert fails. Should be fine since you want panics early in tests.
-    fn insert(self, con: &Self::Connection) -> Self::Model;
+    fn insert(self, con: &mut Self::Connection) -> Self::Model;
 
     /// Get the primary key value for a model type.
     ///

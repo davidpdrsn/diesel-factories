@@ -1,16 +1,19 @@
 error: `#[factory]` attributes are only allowed on association fields
-  --> $DIR/foreign_key_name_on_non_association.rs:39:5
+  --> tests/compile_fail/foreign_key_name_on_non_association.rs:39:5
    |
-39 |     #[factory(foreign_key_name = not_allowed_here)]
-   |     ^
+39 | /     #[factory(foreign_key_name = not_allowed_here)]
+40 | |     pub age: i32,
+   | |________________^
 
-error[E0599]: no method named `country` found for struct `UserFactory<'_>` in the current scope
-  --> $DIR/foreign_key_name_on_non_association.rs:75:10
+error[E0599]: no method named `country` found for struct `UserFactory` in the current scope
+  --> tests/compile_fail/foreign_key_name_on_non_association.rs:75:10
    |
-38 | struct UserFactory<'a> {
-   | ---------------------- method `country` not found for this
+38 |   struct UserFactory<'a> {
+   |   ---------------------- method `country` not found for this struct
 ...
-75 |         .country(CountryFactory::default())
-   |          ^^^^^^^--------------------------- help: remove the arguments
-   |          |
-   |          field, not a method
+74 | /     UserFactory::default()
+75 | |         .country(CountryFactory::default())
+   | |         -^^^^^^^--------------------------- help: remove the arguments
+   | |         ||
+   | |_________|field, not a method
+   |
