@@ -88,7 +88,7 @@ impl MapInput {
 
         quote! {
             impl #ident {
-                fn get_model_fields() -> (#(#table::#fields),*) {
+                pub fn get_model_fields() -> (#(#table::#fields),*) {
                     (#(#table::#fields),*)
                 }
             };
