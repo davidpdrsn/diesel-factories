@@ -36,7 +36,7 @@ pub fn derive_factory(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 struct MapInput {
     ident: Ident,
-    model: Type,
+    table: Type,
     fields: Vec<Ident>,
 }
 
@@ -54,7 +54,7 @@ impl Parse for MapInput {
 
         let mut fields: Vec<Ident> = Vec::new();
 
-        let struct_attr::MapModel { model } = struct_attr::MapModel::from_attributes(&attrs)?;
+        let struct_attr::MapModel { table } = struct_attr::MapModel::from_attributes(&attrs)?;
 
         for field in item_strut_fields {
             let field_span = field.span();
@@ -69,7 +69,7 @@ impl Parse for MapInput {
         Ok(MapInput {
             fields,
             ident,
-            model,
+            table,
         })
     }
 }
@@ -84,12 +84,12 @@ impl MapInput {
     fn factory_trait_impl(&self) -> TokenStream {
         let ident = &self.ident;
         let fields = &self.fields;
-        let model = &self.model;
+        let table = &self.table;
 
         quote! {
             impl #ident {
-                fn get_model_fields() -> (#(#model::#fields),*) {
-                    (#(#model::#fields),*)
+                fn get_model_fields() -> (#(#table::#fields),*) {
+                    (#(#table::#fields),*)
                 }
             };
         }
@@ -119,7 +119,7 @@ mod struct_attr {
 
     #[derive(Debug, FromAttributes)]
     pub struct MapModel {
-        pub model: Type,
+        pub table: Type,
     }
 }
 

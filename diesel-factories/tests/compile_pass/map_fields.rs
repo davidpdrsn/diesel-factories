@@ -20,7 +20,7 @@ mod schema {
 
 #[derive(MapModel, Queryable, Clone)]
 #[map_model(
-    model = crate::schema::users,
+    table = crate::schema::users,
 )]
 struct User {
     pub identity: i32,
